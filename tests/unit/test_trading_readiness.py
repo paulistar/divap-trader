@@ -45,6 +45,8 @@ def test_trading_readiness_when_disabled() -> None:
                         "src.trading.readiness.build_profile_performance",
                         return_value=[],
                     ):
-                        report = build_trading_readiness()
+                        with patch("src.trading.readiness.cache_get", return_value=None):
+                            with patch("src.trading.readiness.cache_set"):
+                                report = build_trading_readiness()
     assert report["ready"] is False
     assert any(c["id"] == "trading_enabled" and not c["ok"] for c in report["checks"])
