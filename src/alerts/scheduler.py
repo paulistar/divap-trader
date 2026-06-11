@@ -57,6 +57,15 @@ def run_divap_scan(
             if signal is None:
                 continue
 
+            if alert_repo.has_recent_alert(symbol, timeframe, signal.direction):
+                logger.info(
+                    "Duplicate setup skipped %s %s (%s)",
+                    symbol,
+                    timeframe,
+                    signal.direction,
+                )
+                continue
+
             alert_id = alert_repo.save_signal(signal)
             key = f"{symbol}:{timeframe}"
             signals_found.append(key)

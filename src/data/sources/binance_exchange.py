@@ -15,3 +15,13 @@ def build_binance_exchange() -> ccxt.binance:
     if settings.binance_use_testnet or settings.trading_mode == "testnet":
         exchange.set_sandbox_mode(True)
     return exchange
+
+
+def build_binance_public_exchange() -> ccxt.binance:
+    """Spot público de produção — OHLCV/HTF (testnet tem histórico curto demais)."""
+    return ccxt.binance(
+        {
+            "enableRateLimit": True,
+            "options": {"defaultType": "spot"},
+        }
+    )

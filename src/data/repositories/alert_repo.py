@@ -44,6 +44,13 @@ ACKNOWLEDGE_SQL = """
 UPDATE alerts SET acknowledged = TRUE WHERE id = %s RETURNING id
 """
 
+RECENT_ALERT_SQL = """
+SELECT id FROM alerts
+WHERE symbol = %s AND timeframe = %s AND direction = %s
+  AND created_at > NOW() - make_interval(hours => %s)
+LIMIT 1
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class AlertRecord:
@@ -139,6 +146,21 @@ class AlertRepository:
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(ACKNOWLEDGE_SQL, (alert_id,))
+                return cur.fetchone() is not None
+
+    def has_recent_alert(
+        self,
+        symbol: str,
+        timeframe: str,
+        direction: str,
+        within_hours: int = 4,
+    ) -> bool:
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    RECENT_ALERT_SQL,
+                    (symbol, timeframe, direction, within_hours),
+                )
                 return cur.fetchone() is not None
 
     def _row_to_record(self, row: dict) -> AlertRecord:

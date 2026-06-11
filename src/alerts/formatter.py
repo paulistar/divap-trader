@@ -4,6 +4,19 @@ from src.core.constants import BANK_ALLOCATION_PCT
 from src.context.models import MarketContext
 from src.detection.divap_scanner import DIVAPSignal
 
+HTF_LABELS = {
+    "bullish": "alta",
+    "bearish": "baixa",
+    "sideways": "lateral",
+    "unknown": "desconhecida",
+}
+
+
+def _htf_label(bias: str | None) -> str:
+    if not bias:
+        return "?"
+    return HTF_LABELS.get(bias, bias)
+
 
 def _fmt_price(value: Decimal) -> str:
     return f"{value:.2f}"
@@ -51,8 +64,8 @@ def format_divap_alert(
             f"Score: {market_context.context_score}/100 | "
             f"Veredito: {market_context.context_verdict}\n"
             f"Fear &amp; Greed: {fg_line}\n"
-            f"HTF 1d/1w: {market_context.htf_trends.get('1d', '?')}/"
-            f"{market_context.htf_trends.get('1w', '?')}"
+            f"HTF 1d/1w: {_htf_label(market_context.htf_trends.get('1d'))}/"
+            f"{_htf_label(market_context.htf_trends.get('1w'))}"
         )
 
     if analysis:

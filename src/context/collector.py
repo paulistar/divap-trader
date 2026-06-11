@@ -67,7 +67,7 @@ class MarketContextCollector:
                 failed.append("news")
 
         try:
-            htf = fetch_htf_trends(symbol, source=self._binance)
+            htf = fetch_htf_trends(symbol)
             if htf:
                 parts = replace(parts, htf_trends=htf)
                 ok.append("htf_trends")
