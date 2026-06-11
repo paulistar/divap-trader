@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from src.core.dashboard_cache import READINESS_CACHE_KEY, cache_get, cache_set
 from src.bankroll.execution_context import get_active_execution_profile
 from src.bankroll.service import build_profile_performance
 from src.core.config import settings
@@ -12,6 +13,7 @@ from src.execution.binance_broker import BinanceBroker
 from src.execution.risk_manager import MIN_ORDER_USDT
 
 MIN_BALANCE_USDT = Decimal("10")
+READINESS_TTL_SECONDS = 60
 
 
 def _check(
@@ -33,6 +35,10 @@ def _check(
 
 
 def build_trading_readiness() -> dict:
+    cached = cache_get(READINESS_CACHE_KEY)
+    if cached is not None:
+        return cached
+
     checks: list[dict] = []
 
     _check(
@@ -143,7 +149,7 @@ def build_trading_readiness() -> dict:
             "executado (scan automático a cada 15 min ou botão Disparar scan)."
         )
 
-    return {
+    result = {
         "ready": ready,
         "checks": checks,
         "active_profile_id": meta.get("active_profile_id"),
@@ -154,3 +160,5 @@ def build_trading_readiness() -> dict:
         "total_profile_trades": total_trades,
         "hint": hint,
     }
+    cache_set(READINESS_CACHE_KEY, result, READINESS_TTL_SECONDS)
+    return result

@@ -11,6 +11,7 @@ from src.core.config import settings
 
 MARKET_CACHE_KEY = "divap:dashboard:market"
 BALANCE_CACHE_KEY = "divap:dashboard:balance"
+READINESS_CACHE_KEY = "divap:dashboard:readiness"
 MARKET_TTL_SECONDS = 300
 BALANCE_TTL_SECONDS = 60
 

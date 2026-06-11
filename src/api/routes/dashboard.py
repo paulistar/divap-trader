@@ -104,7 +104,12 @@ async def dashboard_static(filename: str) -> FileResponse:
         "sw.js": "application/javascript",
         "icon.svg": "image/svg+xml",
     }
-    return FileResponse(path, media_type=media.get(filename))
+    response = FileResponse(path, media_type=media.get(filename))
+    if filename in {"dashboard.js", "dashboard.css", "sw.js"}:
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    elif filename == "manifest.webmanifest":
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @router.post("/dashboard/auth", include_in_schema=False)
@@ -165,13 +170,19 @@ async def dashboard_data(
             "health": HealthData(status="ok", app_env=settings.app_env).model_dump(),
             "stats": _build_stats(),
             "scan": get_scan_status_payload(),
-            "trading_readiness": build_trading_readiness(),
             "open_trades": [_trade_to_dict(t) for t in open_trades],
             "trades": [_trade_to_dict(t) for t in closed_trades],
             "alerts": [alert_to_dashboard_dict(a) for a in alerts],
             "pnl_series": build_pnl_series(),
         },
     )
+
+
+@router.get("/dashboard/trading-readiness", include_in_schema=False)
+async def dashboard_trading_readiness(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    return ApiResponse(success=True, data=build_trading_readiness())
 
 
 @router.get("/dashboard/market", include_in_schema=False)

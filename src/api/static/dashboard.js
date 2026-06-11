@@ -213,6 +213,13 @@ function renderBadges(health, stats, scan) {
   `;
 }
 
+function renderTradingReadinessLoading() {
+  const panel = document.getElementById("trading-readiness-panel");
+  if (panel) {
+    panel.innerHTML = '<div class="empty">Verificando pipeline testnet…</div>';
+  }
+}
+
 function renderTradingReadiness(readiness) {
   const panel = document.getElementById("trading-readiness-panel");
   if (!panel) return;
@@ -244,6 +251,13 @@ function renderTradingReadiness(readiness) {
     ${perfHtml}
     <p class="readiness-hint">${r.hint || ""}</p>
   `;
+}
+
+async function fetchTradingReadiness() {
+  const res = await fetch("/dashboard/trading-readiness", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return null;
+  return body.data || null;
 }
 
 async function fetchStrategyInsights() {
@@ -401,6 +415,17 @@ function renderBankroll(bankroll, profilesPayload) {
   }
 }
 
+async function loadTradingReadiness() {
+  renderTradingReadinessLoading();
+  try {
+    const data = await fetchTradingReadiness();
+    if (data) renderTradingReadiness(data);
+  } catch (_) {
+    const panel = document.getElementById("trading-readiness-panel");
+    if (panel) panel.innerHTML = '<div class="empty">Não foi possível carregar validação testnet.</div>';
+  }
+}
+
 async function loadProfileInsights(profilesPayload) {
   try {
     const data = await fetchStrategyInsights();
@@ -451,8 +476,13 @@ async function loadSlowExtras(stats) {
   renderMarketPlaceholder();
   renderBalancePlaceholder(stats);
   const [market, balance] = await Promise.all([fetchMarket(), fetchBalance()]);
-  if (market) renderMarket(market);
-  if (balance || stats) renderStats(stats, balance);
+  if (market) {
+    renderMarket(market);
+  } else {
+    document.getElementById("market-grid").innerHTML =
+      '<div class="empty">Mercado indisponível agora — tente Atualizar.</div>';
+  }
+  renderStats(stats, balance);
 }
 
 function renderMarket(market) {
@@ -727,13 +757,13 @@ async function loadDashboard() {
     lastData = d;
     renderBadges(d.health, d.stats, d.scan);
     renderScan(d.scan);
-    renderTradingReadiness(d.trading_readiness);
     renderOpenTrades(d.open_trades);
     renderTrades(d.trades);
     renderAlerts(d.alerts);
     renderPnlChart(d.pnl_series);
     loadSlowExtras(d.stats);
     loadStrategyExtras();
+    loadTradingReadiness();
     document.getElementById("footer-updated").textContent =
       "Atualizado: " + new Date().toLocaleString("pt-BR");
     document.getElementById("refresh-label").textContent = "Próximo refresh em 30s";
@@ -760,9 +790,26 @@ function showLogin() {
 }
 
 function registerPwa() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/dashboard/static/sw.js", { scope: "/dashboard/" }).catch(() => {});
-  }
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("/dashboard/static/sw.js?v=2", { scope: "/dashboard/" })
+    .then((reg) => {
+      reg.addEventListener("updatefound", () => {
+        const worker = reg.installing;
+        worker?.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            worker.postMessage({ type: "SKIP_WAITING" });
+          }
+        });
+      });
+      if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+    })
+    .catch(() => {});
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!sessionStorage.getItem("divap-sw-reloaded")) {
+      sessionStorage.setItem("divap-sw-reloaded", "1");
+      window.location.reload();
+    }
+  });
 }
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {
