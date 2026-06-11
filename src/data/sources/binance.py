@@ -14,6 +14,7 @@ TIMEFRAME_MAP: dict[str, str] = {
     "1h": "1h",
     "4h": "4h",
     "1d": "1d",
+    "1w": "1w",
 }
 
 

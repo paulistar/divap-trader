@@ -8,7 +8,7 @@ from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss"
 CRYPTOPANIC_URL = "https://cryptopanic.com/api/v1/posts/"
 
 
@@ -81,7 +81,11 @@ def _fetch_coindesk_rss(
     own_client = client is None
     http = client or httpx.Client(timeout=15.0)
     try:
-        response = http.get(COINDESK_RSS_URL, headers={"User-Agent": "DIVAP-Trader/1.0"})
+        response = http.get(
+            COINDESK_RSS_URL,
+            headers={"User-Agent": "DIVAP-Trader/1.0"},
+            follow_redirects=True,
+        )
         response.raise_for_status()
         root = ET.fromstring(response.text)
         items = root.findall(".//item")
