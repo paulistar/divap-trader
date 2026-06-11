@@ -11,7 +11,8 @@ Deploy na VPS Mart Studios com Cloudflare na frente. Domínio definido pelo oper
 
 - **Domínio:** `trade.martstudiosbr.com.br`
 - **Porta pública:** **80/443** (Easypanel Traefik na VPS — mesma infra de `chat.`, `mcp.`, etc.)
-- **App Docker:** porta **8000** no container (mapeada pelo Traefik)
+- **App Docker:** porta **80** no container (mesmo padrão de `chat.`, `mcp.`, `vps.`)
+- **Easypanel (painel):** porta **8000** (UI administrativa, separada dos apps)
 - **Cloudflare:** registro A `trade` → IP VPS, proxy ativado
 - **SSL:** Cloudflare + Traefik Easypanel (visitante sempre HTTPS)
 - **Caddy standalone:** apenas fallback se VPS sem Easypanel (`deploy/Caddyfile`)

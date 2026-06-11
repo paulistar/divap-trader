@@ -1,15 +1,15 @@
 # Easypanel — projeto martstudios, serviço compose "divap-trader"
-# Domínio: trade.martstudiosbr.com.br → app:8000 (Traefik na :80 da VPS)
+# Domínio: trade.martstudiosbr.com.br → app:80 (padrão Mart Studios: Traefik :80 → container :80)
 services:
   app:
     build: .
     restart: unless-stopped
     expose:
-      - "8000"
+      - "80"
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
-      PORT: "8000"
+      PORT: "80"
       DATABASE_URL: postgresql://divap:${POSTGRES_PASSWORD:-divap}@postgres:5432/divap
       REDIS_URL: redis://redis:6379/0
     env_file:

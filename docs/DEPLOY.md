@@ -2,7 +2,7 @@
 
 **Domínio:** `https://trade.martstudiosbr.com.br`  
 **Porta pública:** 80/443 (via Cloudflare + Easypanel Traefik)  
-**App interna:** porta 8000 no container
+**App interna:** porta 80 no container (padrão Easypanel Mart Studios)
 
 ## Arquitetura na VPS
 
@@ -11,7 +11,7 @@ A VPS Mart Studios já usa **Easypanel** com Traefik na porta **80**. Não insta
 ```
 Visitante → Cloudflare (HTTPS :443)
          → VPS :80 (Easypanel / Traefik)
-         → container app :8000 (FastAPI)
+         → container app :80 (FastAPI)
 ```
 
 Outros subdomínios seguem o mesmo padrão (`chat.`, `mcp.`, `vps.`).
@@ -54,7 +54,8 @@ BINANCE_USE_TESTNET=false
 |-------|-------|
 | Host | `trade.martstudiosbr.com.br` |
 | HTTPS | Ativado |
-| Porta do container | **8000** |
+| Porta do container | **80** |
+| Serviço Compose | **app** (`composeService` no domínio Easypanel) |
 | Protocolo interno | HTTP |
 
 ### 5. Init do banco (após primeiro deploy)
