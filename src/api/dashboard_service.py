@@ -2,63 +2,108 @@
 
 from __future__ import annotations
 
+import logging
+from dataclasses import replace
 from decimal import Decimal
 
-from src.context.collector import MarketContextCollector
-from src.context.models import MarketContext
-from src.core.config import settings
+import httpx
+
+from src.context.fear_greed import fetch_fear_greed
+from src.context.global_market import fetch_global_market
+from src.context.htf_trend import fetch_htf_trends
+from src.context.models import MarketContext, MarketContextParts
+from src.context.scoring import assess_market_context
 from src.core.constants import DEFAULT_SYMBOLS
+from src.core.dashboard_cache import (
+    BALANCE_CACHE_KEY,
+    BALANCE_TTL_SECONDS,
+    MARKET_CACHE_KEY,
+    MARKET_TTL_SECONDS,
+    cache_get,
+    cache_set,
+)
 from src.core.exceptions import ExchangeError
 from src.core.scan_state import get_scan_status
+from src.core.config import settings
 from src.data.repositories.alert_repo import AlertRecord
-from src.detection.divap_scanner import DIVAPSignal, DIVAPCriteria
 from src.data.repositories.trade_repo import TradeRepository
+from src.detection.divap_scanner import DIVAPCriteria, DIVAPSignal
 from src.execution.binance_broker import BinanceBroker
 from src.execution.gate import should_execute_trade
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_testnet_balance() -> dict | None:
     if not settings.binance_use_testnet:
         return None
+    cached = cache_get(BALANCE_CACHE_KEY)
+    if cached is not None:
+        return cached
     try:
         broker = BinanceBroker()
         usdt = broker.get_usdt_balance()
-        return {"usdt_free": str(usdt.quantize(Decimal("0.01")))}
+        payload = {"usdt_free": str(usdt.quantize(Decimal("0.01")))}
+        cache_set(BALANCE_CACHE_KEY, payload, BALANCE_TTL_SECONDS)
+        return payload
     except ExchangeError:
         return None
 
 
 def build_market_overview() -> dict:
-    collector = MarketContextCollector()
+    cached = cache_get(MARKET_CACHE_KEY)
+    if cached is not None:
+        return cached
+
     fear_greed_value: int | None = None
     btc_dominance: float | None = None
     market_change_24h: float | None = None
     scores: list[int] = []
     verdicts: list[str] = []
+    shared = MarketContextParts()
 
-    sample = collector.collect("BTCUSDT", "4h", "buy")
-    if sample.fear_greed:
-        fear_greed_value = sample.fear_greed.value
-    if sample.global_market:
-        btc_dominance = sample.global_market.btc_dominance_pct
-        market_change_24h = sample.global_market.market_cap_change_24h_pct
+    try:
+        with httpx.Client(timeout=10.0) as http:
+            fg = fetch_fear_greed(http)
+            if fg:
+                shared = replace(shared, fear_greed=fg)
+                fear_greed_value = fg.value
+            global_snap = fetch_global_market(http)
+            if global_snap:
+                shared = replace(shared, global_market=global_snap)
+                btc_dominance = global_snap.btc_dominance_pct
+                market_change_24h = global_snap.market_cap_change_24h_pct
+    except Exception as exc:
+        logger.warning("Market overview shared fetch failed: %s", exc)
 
     for symbol in DEFAULT_SYMBOLS[:4]:
-        ctx = collector.collect(symbol, "4h", "buy")
-        scores.append(ctx.context_score)
-        verdicts.append(ctx.context_verdict)
+        try:
+            htf = fetch_htf_trends(symbol)
+            sym_parts = replace(shared, htf_trends=htf or {})
+            score, verdict, _ = assess_market_context(
+                symbol=symbol,
+                signal_timeframe="4h",
+                signal_direction="buy",
+                parts=sym_parts,
+            )
+            scores.append(score)
+            verdicts.append(verdict)
+        except Exception as exc:
+            logger.warning("Market overview score failed for %s: %s", symbol, exc)
 
     avg_score = round(sum(scores) / len(scores)) if scores else None
     verdict_rank = {"confirm": 3, "caution": 2, "reject": 1, "unknown": 0}
     dominant_verdict = max(verdicts, key=lambda v: verdict_rank.get(v, 0)) if verdicts else "unknown"
 
-    return {
+    payload = {
         "fear_greed": fear_greed_value,
         "btc_dominance_pct": btc_dominance,
         "market_cap_change_24h_pct": market_change_24h,
         "avg_context_score": avg_score,
         "dominant_verdict": dominant_verdict,
     }
+    cache_set(MARKET_CACHE_KEY, payload, MARKET_TTL_SECONDS)
+    return payload
 
 
 def execution_reason_for_alert(alert: AlertRecord) -> str:

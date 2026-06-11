@@ -150,8 +150,6 @@ async def dashboard_data(
         data={
             "health": HealthData(status="ok", app_env=settings.app_env).model_dump(),
             "stats": _build_stats(),
-            "balance": fetch_testnet_balance(),
-            "market": build_market_overview(),
             "scan": get_scan_status_payload(),
             "open_trades": [_trade_to_dict(t) for t in open_trades],
             "trades": [_trade_to_dict(t) for t in closed_trades],
@@ -159,6 +157,20 @@ async def dashboard_data(
             "pnl_series": build_pnl_series(),
         },
     )
+
+
+@router.get("/dashboard/market", include_in_schema=False)
+async def dashboard_market(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    return ApiResponse(success=True, data=build_market_overview())
+
+
+@router.get("/dashboard/balance", include_in_schema=False)
+async def dashboard_balance(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict | None]:
+    return ApiResponse(success=True, data=fetch_testnet_balance())
 
 
 @router.get("/dashboard/alerts/{alert_id}", include_in_schema=False)

@@ -60,6 +60,20 @@ async function fetchDashboard() {
   return body;
 }
 
+async function fetchMarket() {
+  const res = await fetch("/dashboard/market", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return null;
+  return body.data || null;
+}
+
+async function fetchBalance() {
+  const res = await fetch("/dashboard/balance", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return null;
+  return body.data || null;
+}
+
 async function login(secret) {
   const res = await fetch("/dashboard/auth", {
     method: "POST",
@@ -190,6 +204,37 @@ function renderBadges(health, stats) {
     <span class="badge ${testnet ? "warn" : ""}">${testnet ? "Testnet" : stats?.trading_mode || "—"}</span>
     <span class="badge ${trading ? "ok" : "off"}">Trading ${trading ? "ON" : "OFF"}</span>
   `;
+}
+
+function renderMarketPlaceholder() {
+  document.getElementById("market-grid").innerHTML = `
+    <div class="card"><div class="card-label">Fear & Greed</div><div class="card-value">…</div></div>
+    <div class="card"><div class="card-label">Dominância BTC</div><div class="card-value">…</div></div>
+    <div class="card"><div class="card-label">Mercado 24h</div><div class="card-value">…</div></div>
+    <div class="card"><div class="card-label">Score médio</div><div class="card-value">…</div></div>
+    <div class="card"><div class="card-label">Veredito dominante</div><div class="card-value">…</div></div>
+  `;
+}
+
+function renderBalancePlaceholder(stats) {
+  const d = stats || {};
+  document.getElementById("stats-grid").innerHTML = `
+    <div class="card highlight"><div class="card-label">USDT demo</div><div class="card-value">…</div><div class="card-sub">Carregando saldo</div></div>
+    <div class="card"><div class="card-label">Win rate</div><div class="card-value">${fmtNum(d.win_rate_pct, 1)}%</div></div>
+    <div class="card"><div class="card-label">PnL total</div><div class="card-value">${fmtNum(d.total_pnl_usdt)} USDT</div></div>
+    <div class="card"><div class="card-label">Trades fechados</div><div class="card-value">${d.closed_count ?? 0}</div></div>
+    <div class="card"><div class="card-label">Abertos</div><div class="card-value">${d.open_count ?? 0}</div></div>
+    <div class="card"><div class="card-label">Vitórias / Derrotas</div><div class="card-value">${d.wins ?? 0} / ${d.losses ?? 0}</div></div>
+    <div class="card"><div class="card-label">Taxas</div><div class="card-value">${fmtNum(d.total_fees_usdt)} USDT</div></div>
+  `;
+}
+
+async function loadSlowExtras(stats) {
+  renderMarketPlaceholder();
+  renderBalancePlaceholder(stats);
+  const [market, balance] = await Promise.all([fetchMarket(), fetchBalance()]);
+  if (market) renderMarket(market);
+  if (balance || stats) renderStats(stats, balance);
 }
 
 function renderMarket(market) {
@@ -460,13 +505,12 @@ async function loadDashboard() {
     const d = payload.data || {};
     lastData = d;
     renderBadges(d.health, d.stats);
-    renderMarket(d.market);
-    renderStats(d.stats, d.balance);
     renderScan(d.scan);
     renderOpenTrades(d.open_trades);
     renderTrades(d.trades);
     renderAlerts(d.alerts);
     renderPnlChart(d.pnl_series);
+    loadSlowExtras(d.stats);
     document.getElementById("footer-updated").textContent =
       "Atualizado: " + new Date().toLocaleString("pt-BR");
     document.getElementById("refresh-label").textContent = "Próximo refresh em 30s";
