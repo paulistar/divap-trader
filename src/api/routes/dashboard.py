@@ -6,7 +6,11 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from src.bankroll.service import build_bankroll_payload, build_profiles_payload
+from src.bankroll.service import (
+    build_bankroll_payload,
+    build_profile_insights_payload,
+    build_profiles_payload,
+)
 
 from src.alerts.scheduler import run_divap_scan
 from src.api.dashboard_auth import (
@@ -191,6 +195,20 @@ async def dashboard_strategy(
         data={
             "profiles": build_profiles_payload(),
             "bankroll": build_bankroll_payload(),
+        },
+    )
+
+
+@router.get("/dashboard/strategy/insights", include_in_schema=False)
+async def dashboard_strategy_insights(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    insights = build_profile_insights_payload()
+    return ApiResponse(
+        success=True,
+        data={
+            "insights": insights,
+            "insights_available": bool(insights),
         },
     )
 

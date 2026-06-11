@@ -145,7 +145,23 @@ def build_profiles_payload() -> dict:
                 "headline": snap.assessment.headline,
                 "detail": snap.assessment.detail,
                 "performance": performance.get(snap.profile.id),
+                "ai_insight": None,
             }
             for snap in snapshots
         ],
     }
+
+
+def build_profile_insights_payload() -> dict[str, str]:
+    from src.profiles.llm_insights import generate_profile_insights
+
+    repo = BankrollRepository()
+    settings = repo.get_settings()
+    market = build_market_overview()
+    snapshots = assess_all_profiles(market, settings.active_profile_id)
+    return generate_profile_insights(
+        market,
+        snapshots,
+        active_profile_id=settings.active_profile_id,
+        goal_reached=settings.goal_reached_at is not None,
+    )

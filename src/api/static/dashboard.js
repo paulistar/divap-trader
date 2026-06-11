@@ -206,6 +206,13 @@ function renderBadges(health, stats) {
   `;
 }
 
+async function fetchStrategyInsights() {
+  const res = await fetch("/dashboard/strategy/insights", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return null;
+  return body.data || null;
+}
+
 async function fetchStrategy() {
   const res = await fetch("/dashboard/strategy", { credentials: "same-origin" });
   const body = await res.json().catch(() => ({}));
@@ -242,7 +249,7 @@ function profileLabel(id) {
   return map[id] || id || "—";
 }
 
-function renderProfiles(data) {
+function renderProfiles(data, insightsMap) {
   const profiles = data?.profiles || [];
   const grid = document.getElementById("profiles-grid");
   if (!profiles.length) {
@@ -251,6 +258,7 @@ function renderProfiles(data) {
   }
   grid.innerHTML = profiles.map((p) => {
     const perf = p.performance;
+    const ai = insightsMap?.[p.id] || p.ai_insight;
     const perfHtml = perf ? `
       <div class="profile-stats">
         <div><span>PnL mês</span><strong>${fmtNum(perf.month_pnl_usdt)}</strong></div>
@@ -258,6 +266,9 @@ function renderProfiles(data) {
         <div><span>Fechados</span><strong>${perf.closed_count ?? 0}</strong></div>
         <div><span>PnL total</span><strong>${fmtNum(perf.total_pnl_usdt)}</strong></div>
       </div>` : "";
+    const aiHtml = ai
+      ? `<div class="profile-ai-insight"><strong>IA:</strong> ${ai.replace(/</g, "&lt;")}</div>`
+      : "";
     return `
     <div class="profile-card ${p.is_active ? "active" : ""}">
       ${p.is_active ? '<span class="active-pill">Ativo na execução</span>' : ""}
@@ -266,6 +277,7 @@ function renderProfiles(data) {
       <div class="fit-score ${profileFitClass(p.status)}">${p.fit_score}%</div>
       <div class="profile-headline">${p.headline || ""}</div>
       <div class="profile-detail">${p.detail || ""}</div>
+      ${aiHtml}
       ${perfHtml}
     </div>`;
   }).join("");
@@ -342,10 +354,21 @@ function renderBankroll(bankroll, profilesPayload) {
     <p class="subtitle" style="margin-top:0.5rem;">* Meta semanal = divisão proporcional da meta mensual pelas semanas do mês.</p>
   `;
 
-  if (profilesPayload?.profiles) renderProfiles(profilesPayload);
+  if (profilesPayload?.profiles) renderProfiles(profilesPayload, null);
   if (profilesPayload) {
     renderProfilePerformance(profilesPayload);
     renderProfileHistory(profilesPayload);
+  }
+}
+
+async function loadProfileInsights(profilesPayload) {
+  try {
+    const data = await fetchStrategyInsights();
+    if (data?.insights && profilesPayload) {
+      renderProfiles(profilesPayload, data.insights);
+    }
+  } catch (_) {
+    /* mantém texto rule-based */
   }
 }
 
@@ -354,6 +377,7 @@ async function loadStrategyExtras() {
     const data = await fetchStrategy();
     if (!data) return;
     renderBankroll(data.bankroll, data.profiles);
+    loadProfileInsights(data.profiles);
   } catch (_) {
     document.getElementById("profiles-grid").innerHTML =
       '<div class="empty">Não foi possível carregar perfis agora.</div>';
@@ -422,8 +446,9 @@ function renderScan(scan) {
   const s = scan || {};
   const since = s.seconds_since_last != null ? `há ${fmtDuration(s.seconds_since_last)}` : "nunca";
   const until = s.seconds_until_next != null ? `~${fmtDuration(s.seconds_until_next)}` : "—";
+  const interval = s.interval_seconds ? Math.round(s.interval_seconds / 60) : 15;
   document.getElementById("scan-status").textContent =
-    `Último scan: ${since} · próximo em ${until} · sinais: ${s.last_signals ?? 0}`;
+    `Último scan: ${since} · próximo em ${until} · sinais: ${s.last_signals ?? 0} · automático a cada ${interval} min (beat)`;
 }
 
 function tradeRow(t, clickable = true) {

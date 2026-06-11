@@ -114,6 +114,17 @@ section h2 {
   color: var(--accent);
   margin-bottom: 0.35rem;
 }
+.profile-card .profile-ai-insight {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.25);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #bfdbfe;
+}
+.profile-card .profile-ai-insight strong { color: var(--accent); }
 .profile-card .profile-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
