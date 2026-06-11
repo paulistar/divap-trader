@@ -22,7 +22,7 @@ from src.core.exceptions import AnalysisError, ExchangeError
 from src.data.repositories.alert_repo import AlertRepository
 from src.data.repositories.candle_repo import CandleRepository
 from src.data.sources.binance import BinanceSource
-from src.detection.divap_scanner import DIVAPScanner
+from src.markets.instruments import instrument_from_symbol
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,13 @@ def run_divap_scan(
                 symbol, timeframe, signal.direction
             )
 
-            alert_id = alert_repo.save_signal(signal, market_context)
+            instrument = instrument_from_symbol(signal.symbol)
+            alert_id = alert_repo.save_signal(
+                signal,
+                market_context,
+                market=instrument.market_value,
+                venue=instrument.venue_value,
+            )
             metrics.signals_saved += 1
             key = f"{symbol}:{timeframe}"
             signals_found.append(key)

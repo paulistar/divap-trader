@@ -6,8 +6,11 @@ from src.alerts.telegram import TelegramNotifier
 from src.alerts.trade_formatter import format_trade_closed
 from src.core.exceptions import ExchangeError
 from src.data.repositories.trade_repo import TradeRecord, TradeRepository
-from src.data.sources.binance import BinanceSource
-from src.execution.binance_broker import BinanceBroker
+from src.data.sources.interfaces import MarketDataSource
+from src.execution.interfaces import ExecutionBroker
+from src.execution.binance_broker import BinanceBroker  # noqa: F401 — parse_filled on broker instances
+from src.markets.factory import get_broker, get_data_source
+from src.markets.types import Venue
 from src.profiles.exit_policy import should_time_stop
 from src.profiles.loader import load_profile
 
@@ -35,15 +38,17 @@ def _pnl_for_sell(
 class PositionMonitor:
     def __init__(
         self,
-        broker: BinanceBroker | None = None,
+        broker: ExecutionBroker | None = None,
         trade_repo: TradeRepository | None = None,
         notifier: TelegramNotifier | None = None,
-        market_source: BinanceSource | None = None,
+        market_source: MarketDataSource | None = None,
+        venue: Venue = Venue.BINANCE,
     ) -> None:
-        self._broker = broker or BinanceBroker()
+        self._venue = venue
+        self._broker = broker or get_broker(venue)
         self._repo = trade_repo or TradeRepository()
         self._notifier = notifier or TelegramNotifier()
-        self._source = market_source or BinanceSource()
+        self._source = market_source or get_data_source(venue)
 
     def sync_open_positions(self) -> dict[str, int]:
         trades = self._repo.list_open_trades()
@@ -51,6 +56,8 @@ class PositionMonitor:
         errors = 0
 
         for trade in trades:
+            if trade.market != "crypto" or trade.venue != "binance":
+                continue
             try:
                 if self._sync_trade(trade):
                     closed += 1

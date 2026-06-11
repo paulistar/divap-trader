@@ -96,6 +96,12 @@ SCHEMA_STATEMENTS: list[str] = [
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS profile_id TEXT DEFAULT 'divap'",
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS goal_protected BOOLEAN NOT NULL DEFAULT FALSE",
     "CREATE INDEX IF NOT EXISTS idx_trades_profile_id ON trades (profile_id, closed_at DESC)",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS market TEXT NOT NULL DEFAULT 'crypto'",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS venue TEXT NOT NULL DEFAULT 'binance'",
+    "ALTER TABLE trades ADD COLUMN IF NOT EXISTS market TEXT NOT NULL DEFAULT 'crypto'",
+    "ALTER TABLE trades ADD COLUMN IF NOT EXISTS venue TEXT NOT NULL DEFAULT 'binance'",
+    "CREATE INDEX IF NOT EXISTS idx_trades_market ON trades (market, status, created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_alerts_market ON alerts (market, created_at DESC)",
     """
     CREATE TABLE IF NOT EXISTS bankroll_settings (
         id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),

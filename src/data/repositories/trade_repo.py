@@ -14,13 +14,13 @@ INSERT INTO trades (
     entry_price, stop_loss, take_profit, quantity, quote_amount,
     context_verdict, context_score, exchange_order_id,
     stop_order_id, tp_order_id, trading_mode, opened_at,
-    profile_id, goal_protected
+    profile_id, goal_protected, market, venue
 ) VALUES (
     %s, %s, %s, %s, %s, %s,
     %s, %s, %s, %s, %s,
     %s, %s, %s,
     %s, %s, %s, %s,
-    %s, %s
+    %s, %s, %s, %s
 ) RETURNING id
 """
 
@@ -151,6 +151,8 @@ class TradeRecord:
     created_at: datetime
     profile_id: str | None = None
     goal_protected: bool = False
+    market: str = "crypto"
+    venue: str = "binance"
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +213,8 @@ class TradeRepository:
         opened_at: datetime,
         profile_id: str = "divap",
         goal_protected: bool = False,
+        market: str = "crypto",
+        venue: str = "binance",
     ) -> int:
         with self._connection() as conn:
             with conn.cursor() as cur:
@@ -237,6 +241,8 @@ class TradeRepository:
                         opened_at,
                         profile_id,
                         goal_protected,
+                        market,
+                        venue,
                     ),
                 )
                 return cur.fetchone()[0]
@@ -369,6 +375,8 @@ class TradeRepository:
             trading_mode=row["trading_mode"],
             profile_id=row.get("profile_id"),
             goal_protected=bool(row.get("goal_protected", False)),
+            market=row.get("market") or "crypto",
+            venue=row.get("venue") or "binance",
             opened_at=row["opened_at"],
             closed_at=row["closed_at"],
             created_at=row["created_at"],

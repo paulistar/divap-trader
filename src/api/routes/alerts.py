@@ -34,6 +34,8 @@ def _alert_to_dict(record) -> dict:
         "fear_greed": record.fear_greed,
         "htf_1d": record.htf_1d,
         "htf_1w": record.htf_1w,
+        "market": record.market,
+        "venue": record.venue,
     }
 
 

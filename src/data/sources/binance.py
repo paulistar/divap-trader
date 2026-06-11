@@ -6,7 +6,7 @@ import ccxt
 from src.core.exceptions import ExchangeError
 from src.data.sources.binance_exchange import build_binance_exchange
 from src.data.models.candle import Candle
-from src.data.sources.interfaces import ExchangeSource
+from src.data.sources.interfaces import MarketDataSource
 
 # ccxt timeframe keys
 TIMEFRAME_MAP: dict[str, str] = {
@@ -47,7 +47,7 @@ def parse_ohlcv_row(symbol: str, timeframe: str, row: list) -> Candle:
     )
 
 
-class BinanceSource(ExchangeSource):
+class BinanceSource(MarketDataSource):
     def __init__(self, exchange: ccxt.binance | None = None) -> None:
         self._exchange = exchange or self._build_exchange()
 

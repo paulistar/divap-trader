@@ -34,6 +34,8 @@ def _trade_to_dict(record) -> dict:
         "trading_mode": record.trading_mode,
         "profile_id": record.profile_id,
         "goal_protected": record.goal_protected,
+        "market": record.market,
+        "venue": record.venue,
         "opened_at": record.opened_at.isoformat() if record.opened_at else None,
         "closed_at": record.closed_at.isoformat() if record.closed_at else None,
         "created_at": record.created_at.isoformat(),

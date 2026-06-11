@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from src.data.models.candle import Candle
 
 
-class ExchangeSource(ABC):
-    """Abstract market data source — Binance MVP, Bybit Fase 3."""
+class MarketDataSource(ABC):
+    """Abstract market data source — Binance MVP, OANDA Fase 2."""
 
     @abstractmethod
     def fetch_ohlcv(
@@ -14,3 +14,7 @@ class ExchangeSource(ABC):
         limit: int = 100,
     ) -> list[Candle]:
         """Fetch OHLCV candles for symbol/timeframe."""
+
+
+# Backward-compatible alias (ADR 002)
+ExchangeSource = MarketDataSource

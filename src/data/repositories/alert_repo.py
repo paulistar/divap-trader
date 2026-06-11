@@ -17,12 +17,14 @@ INSERT INTO alerts (
     symbol, timeframe, direction, confidence, criteria,
     entry_price, stop_loss, targets, rsi_value, volume_ratio,
     divergence_type, pattern_detected, fibo_level,
-    context_score, context_verdict, fear_greed, htf_1d, htf_1w
+    context_score, context_verdict, fear_greed, htf_1d, htf_1w,
+    market, venue
 ) VALUES (
     %s, %s, %s, %s, %s,
     %s, %s, %s, %s, %s,
     %s, %s, %s,
-    %s, %s, %s, %s, %s
+    %s, %s, %s, %s, %s,
+    %s, %s
 ) RETURNING id, created_at
 """
 
@@ -100,6 +102,8 @@ class AlertRecord:
     fear_greed: int | None = None
     htf_1d: str | None = None
     htf_1w: str | None = None
+    market: str = "crypto"
+    venue: str = "binance"
 
 
 class AlertRepository:
@@ -122,6 +126,9 @@ class AlertRepository:
         self,
         signal: DIVAPSignal,
         market_context: MarketContext | None = None,
+        *,
+        market: str = "crypto",
+        venue: str = "binance",
     ) -> int:
         targets_json = Json([str(t) for t in signal.targets])
         criteria_json = Json(signal.criteria.to_dict())
@@ -154,6 +161,8 @@ class AlertRepository:
                         fg,
                         htf_1d,
                         htf_1w,
+                        market,
+                        venue,
                     ),
                 )
                 row = cur.fetchone()
@@ -274,4 +283,6 @@ class AlertRepository:
             fear_greed=row.get("fear_greed"),
             htf_1d=row.get("htf_1d"),
             htf_1w=row.get("htf_1w"),
+            market=row.get("market") or "crypto",
+            venue=row.get("venue") or "binance",
         )

@@ -7,11 +7,13 @@ from src.context.models import MarketContext
 from src.core.config import settings
 from src.core.exceptions import ExchangeError
 from src.data.repositories.trade_repo import TradeRepository
-from src.data.sources.binance import BinanceSource
+from src.data.sources.interfaces import MarketDataSource
 from src.detection.divap_scanner import DIVAPSignal
-from src.execution.binance_broker import BinanceBroker
+from src.execution.interfaces import ExecutionBroker
 from src.bankroll.execution_context import get_active_execution_profile, get_execution_context
 from src.execution.gate import should_execute_trade
+from src.markets.factory import get_broker, get_data_source
+from src.markets.types import Market, Venue
 from src.profiles.exit_policy import resolve_take_profit
 from src.execution.risk_manager import (
     MIN_ORDER_USDT,
@@ -37,13 +39,16 @@ class TradeExecutionResult:
 class TradeExecutor:
     def __init__(
         self,
-        broker: BinanceBroker | None = None,
+        broker: ExecutionBroker | None = None,
         trade_repo: TradeRepository | None = None,
-        market_source: BinanceSource | None = None,
+        market_source: MarketDataSource | None = None,
+        venue: Venue = Venue.BINANCE,
     ) -> None:
-        self._broker = broker or BinanceBroker()
+        self._venue = venue
+        self._market = Market.CRYPTO if venue == Venue.BINANCE else Market.FOREX
+        self._broker = broker or get_broker(venue)
         self._repo = trade_repo or TradeRepository()
-        self._source = market_source or BinanceSource()
+        self._source = market_source or get_data_source(venue)
 
     def try_execute(
         self,
@@ -132,6 +137,8 @@ class TradeExecutor:
                 opened_at=datetime.now(UTC),
                 profile_id=profile_id,
                 goal_protected=goal_protected,
+                market=self._market.value,
+                venue=self._venue.value,
             )
             return TradeExecutionResult(
                 trade_id=trade_id,
@@ -252,6 +259,8 @@ class TradeExecutor:
             opened_at=datetime.now(UTC),
             profile_id=profile_id,
             goal_protected=goal_protected,
+            market=self._market.value,
+            venue=self._venue.value,
         )
 
         logger.info("Trade #%s opened BUY %s qty=%s", trade_id, signal.symbol, quantity)
@@ -324,6 +333,8 @@ class TradeExecutor:
             opened_at=datetime.now(UTC),
             profile_id=profile_id,
             goal_protected=goal_protected,
+            market=self._market.value,
+            venue=self._venue.value,
         )
 
         logger.info("Trade #%s opened SELL %s qty=%s", trade_id, signal.symbol, filled_qty)

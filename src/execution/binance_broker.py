@@ -4,12 +4,22 @@ from decimal import Decimal
 from src.core.exceptions import ExchangeError
 from src.data.sources.binance import from_ccxt_symbol, to_ccxt_symbol
 from src.data.sources.binance_exchange import build_binance_exchange
+from src.execution.interfaces import ExecutionBroker
+from src.markets.types import Market, Venue
 
 logger = logging.getLogger(__name__)
 
 
-class BinanceBroker:
+class BinanceBroker(ExecutionBroker):
     """Spot order execution via ccxt (testnet when configured)."""
+
+    @property
+    def market(self) -> str:
+        return Market.CRYPTO.value
+
+    @property
+    def venue(self) -> str:
+        return Venue.BINANCE.value
 
     def __init__(self, exchange=None) -> None:
         self._exchange = exchange
