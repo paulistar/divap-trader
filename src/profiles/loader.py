@@ -6,7 +6,13 @@ from pathlib import Path
 
 import yaml
 
-from src.profiles.models import ProfileAdvisorRules, ProfileExecution, ProfileScan, TradingProfile
+from src.profiles.models import (
+    ProfileAdvisorRules,
+    ProfileExecution,
+    ProfileExit,
+    ProfileScan,
+    TradingProfile,
+)
 
 _PROFILES_DIR = Path(__file__).resolve().parent
 _DEFAULT_ORDER = ("divap", "conservador", "caixa_rapido", "agressivo")
@@ -16,7 +22,9 @@ def _parse_profile(data: dict) -> TradingProfile:
     execution_raw = data["execution"]
     advisor_raw = data["advisor"]
     scan_raw = data.get("scan") or {}
+    exit_raw = data.get("exit") or {}
     allowed_tfs = tuple(execution_raw.get("allowed_timeframes", ("4h",)))
+    take_profit_fibo = exit_raw.get("take_profit_fibo")
     return TradingProfile(
         id=data["id"],
         name=data["name"],
@@ -43,6 +51,12 @@ def _parse_profile(data: dict) -> TradingProfile:
             timeframes=tuple(scan_raw.get("timeframes", allowed_tfs)),
             symbols=tuple(scan_raw["symbols"]) if scan_raw.get("symbols") else None,
             monitor_interval_seconds=int(scan_raw.get("monitor_interval_seconds", 300)),
+        ),
+        exit=ProfileExit(
+            take_profit_fibo=Decimal(str(take_profit_fibo)) if take_profit_fibo else None,
+            time_stop_candles=int(exit_raw.get("time_stop_candles", 0)),
+            time_stop_min_move_pct=Decimal(str(exit_raw.get("time_stop_min_move_pct", "0"))),
+            time_stop_timeframes=tuple(exit_raw.get("time_stop_timeframes", ())),
         ),
     )
 

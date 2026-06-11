@@ -108,7 +108,7 @@ def run_divap_scan(
                 message = format_divap_alert(signal, analysis_text, market_context)
                 notifier.send(message)
 
-            _, execution, meta = get_active_execution_profile()
+            profile, execution, meta = get_active_execution_profile()
             goal_protected = bool(meta.get("protected_mode", False))
 
             if settings.trading_enabled:
@@ -126,6 +126,8 @@ def run_divap_scan(
                     settings,
                     execution,
                     goal_protected=goal_protected,
+                    profile=profile,
+                    candles=candles,
                 )
                 if not allowed:
                     metrics.record_gate_block(reason)

@@ -4,8 +4,12 @@ from decimal import Decimal
 
 from src.alerts.telegram import TelegramNotifier
 from src.alerts.trade_formatter import format_trade_closed
+from src.core.exceptions import ExchangeError
 from src.data.repositories.trade_repo import TradeRecord, TradeRepository
+from src.data.sources.binance import BinanceSource
 from src.execution.binance_broker import BinanceBroker
+from src.profiles.exit_policy import should_time_stop
+from src.profiles.loader import load_profile
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +38,12 @@ class PositionMonitor:
         broker: BinanceBroker | None = None,
         trade_repo: TradeRepository | None = None,
         notifier: TelegramNotifier | None = None,
+        market_source: BinanceSource | None = None,
     ) -> None:
         self._broker = broker or BinanceBroker()
         self._repo = trade_repo or TradeRepository()
         self._notifier = notifier or TelegramNotifier()
+        self._source = market_source or BinanceSource()
 
     def sync_open_positions(self) -> dict[str, int]:
         trades = self._repo.list_open_trades()
@@ -55,9 +61,25 @@ class PositionMonitor:
         return {"checked": len(trades), "closed": closed, "errors": errors}
 
     def _sync_trade(self, trade: TradeRecord) -> bool:
+        if self._apply_time_stop(trade):
+            return True
         if trade.direction == "buy":
             return self._sync_buy_trade(trade)
         return self._sync_sell_trade(trade)
+
+    def _apply_time_stop(self, trade: TradeRecord) -> bool:
+        profile = load_profile(trade.profile_id or "divap")
+        if profile is None or profile.exit.time_stop_candles <= 0:
+            return False
+        try:
+            candles = self._source.fetch_ohlcv(trade.symbol, trade.timeframe, limit=100)
+        except ExchangeError as exc:
+            logger.warning("Time stop skipped for trade #%s: %s", trade.id, exc)
+            return False
+        if not should_time_stop(trade, profile, candles):
+            return False
+        logger.info("Time stop closing trade #%s %s", trade.id, trade.symbol)
+        return self._market_close(trade, "time_stop")
 
     def _order_closed(self, symbol: str, order_id: str | None) -> tuple[bool, Decimal | None]:
         if not order_id:

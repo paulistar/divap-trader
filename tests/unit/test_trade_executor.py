@@ -5,6 +5,14 @@ from unittest.mock import MagicMock, patch
 from src.context.models import MarketContext
 from src.detection.divap_scanner import DIVAPCriteria, DIVAPSignal
 from src.execution.trade_executor import TradeExecutor
+from src.profiles.loader import load_profile
+from tests.unit.test_execution_gate import _execution
+
+
+def _profile_context():
+    profile = load_profile("divap")
+    execution = _execution()
+    return profile, execution, {"protected_mode": False, "active_profile_id": "divap"}
 
 
 def _signal() -> DIVAPSignal:
@@ -44,8 +52,17 @@ def _context() -> MarketContext:
     )
 
 
+@patch("src.execution.trade_executor.get_execution_context", return_value=("divap", False))
+@patch("src.execution.trade_executor.get_active_execution_profile")
 @patch("src.execution.trade_executor.settings")
-def test_executor_skips_when_trading_disabled(mock_settings: MagicMock) -> None:
+@patch.object(TradeExecutor, "_fetch_candles", return_value=[])
+def test_executor_skips_when_trading_disabled(
+    mock_fetch: MagicMock,
+    mock_settings: MagicMock,
+    mock_active_profile: MagicMock,
+    mock_execution_context: MagicMock,
+) -> None:
+    mock_active_profile.return_value = _profile_context()
     mock_settings.trading_enabled = False
     executor = TradeExecutor(broker=MagicMock(), trade_repo=MagicMock())
     result = executor.try_execute(_signal(), alert_id=1, market_context=_context())
@@ -53,8 +70,17 @@ def test_executor_skips_when_trading_disabled(mock_settings: MagicMock) -> None:
     assert result.reason == "trading_disabled"
 
 
+@patch("src.execution.trade_executor.get_execution_context", return_value=("divap", False))
+@patch("src.execution.trade_executor.get_active_execution_profile")
 @patch("src.execution.trade_executor.settings")
-def test_executor_dry_run_creates_simulated_trade(mock_settings: MagicMock) -> None:
+@patch.object(TradeExecutor, "_fetch_candles", return_value=[])
+def test_executor_dry_run_creates_simulated_trade(
+    mock_fetch: MagicMock,
+    mock_settings: MagicMock,
+    mock_active_profile: MagicMock,
+    mock_execution_context: MagicMock,
+) -> None:
+    mock_active_profile.return_value = _profile_context()
     mock_settings.trading_enabled = True
     mock_settings.trading_mode = "testnet"
     mock_settings.binance_use_testnet = True
@@ -83,8 +109,17 @@ def test_executor_dry_run_creates_simulated_trade(mock_settings: MagicMock) -> N
     assert call_kwargs["status"] == "simulated"
 
 
+@patch("src.execution.trade_executor.get_execution_context", return_value=("divap", False))
+@patch("src.execution.trade_executor.get_active_execution_profile")
 @patch("src.execution.trade_executor.settings")
-def test_executor_live_buy(mock_settings: MagicMock) -> None:
+@patch.object(TradeExecutor, "_fetch_candles", return_value=[])
+def test_executor_live_buy(
+    mock_fetch: MagicMock,
+    mock_settings: MagicMock,
+    mock_active_profile: MagicMock,
+    mock_execution_context: MagicMock,
+) -> None:
+    mock_active_profile.return_value = _profile_context()
     mock_settings.trading_enabled = True
     mock_settings.trading_mode = "testnet"
     mock_settings.binance_use_testnet = True

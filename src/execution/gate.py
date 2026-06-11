@@ -2,9 +2,11 @@ from decimal import Decimal
 
 from src.context.models import MarketContext
 from src.core.config import Settings, settings
+from src.data.models.candle import Candle
 from src.detection.divap_scanner import DIVAPSignal
 from src.execution.risk_manager import risk_reward_ratio
-from src.profiles.models import ProfileExecution
+from src.profiles.exit_policy import resolve_take_profit
+from src.profiles.models import ProfileExecution, TradingProfile
 
 
 def should_execute_trade(
@@ -14,6 +16,8 @@ def should_execute_trade(
     execution: ProfileExecution | None = None,
     *,
     goal_protected: bool = False,
+    profile: TradingProfile | None = None,
+    candles: list[Candle] | None = None,
 ) -> tuple[bool, str]:
     cfg = cfg or settings
 
@@ -59,7 +63,15 @@ def should_execute_trade(
     if not signal.targets:
         return False, "no_targets"
 
-    rr = risk_reward_ratio(signal.entry_price, signal.stop_loss, signal.targets[0])
+    if profile is not None:
+        take_profit = resolve_take_profit(signal, profile, candles)
+    else:
+        take_profit = signal.targets[0]
+
+    if take_profit is None:
+        return False, "no_targets"
+
+    rr = risk_reward_ratio(signal.entry_price, signal.stop_loss, take_profit)
     if rr < profile_exec.min_risk_reward:
         return False, f"rr_below_minimum_{rr}"
 

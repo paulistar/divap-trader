@@ -5,6 +5,14 @@ from decimal import Decimal
 
 
 @dataclass(frozen=True, slots=True)
+class ProfileExit:
+    take_profit_fibo: Decimal | None
+    time_stop_candles: int
+    time_stop_min_move_pct: Decimal
+    time_stop_timeframes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProfileScan:
     interval_seconds: int
     timeframes: tuple[str, ...]
@@ -41,6 +49,7 @@ class TradingProfile:
     execution: ProfileExecution
     advisor: ProfileAdvisorRules
     scan: ProfileScan
+    exit: ProfileExit
 
 
 @dataclass(frozen=True, slots=True)

@@ -7,10 +7,12 @@ from src.context.models import MarketContext
 from src.core.config import settings
 from src.core.exceptions import ExchangeError
 from src.data.repositories.trade_repo import TradeRepository
+from src.data.sources.binance import BinanceSource
 from src.detection.divap_scanner import DIVAPSignal
 from src.execution.binance_broker import BinanceBroker
 from src.bankroll.execution_context import get_active_execution_profile, get_execution_context
 from src.execution.gate import should_execute_trade
+from src.profiles.exit_policy import resolve_take_profit
 from src.execution.risk_manager import (
     MIN_ORDER_USDT,
     base_quantity_from_quote,
@@ -37,9 +39,11 @@ class TradeExecutor:
         self,
         broker: BinanceBroker | None = None,
         trade_repo: TradeRepository | None = None,
+        market_source: BinanceSource | None = None,
     ) -> None:
         self._broker = broker or BinanceBroker()
         self._repo = trade_repo or TradeRepository()
+        self._source = market_source or BinanceSource()
 
     def try_execute(
         self,
@@ -47,14 +51,17 @@ class TradeExecutor:
         alert_id: int,
         market_context: MarketContext | None,
     ) -> TradeExecutionResult:
-        _, execution, meta = get_active_execution_profile()
+        profile, execution, meta = get_active_execution_profile()
         profile_id, goal_protected = get_execution_context()
+        candles = self._fetch_candles(signal)
         allowed, reason = should_execute_trade(
             signal,
             market_context,
             settings,
             execution,
             goal_protected=meta.get("protected_mode", False),
+            profile=profile,
+            candles=candles,
         )
         if not allowed:
             logger.info(
@@ -86,7 +93,19 @@ class TradeExecutor:
                 direction=signal.direction,
             )
 
-        take_profit = signal.targets[0]
+        take_profit = (
+            resolve_take_profit(signal, profile, candles)
+            if profile is not None
+            else signal.targets[0]
+        )
+        if take_profit is None:
+            return TradeExecutionResult(
+                trade_id=None,
+                executed=False,
+                reason="no_targets",
+                symbol=signal.symbol,
+                direction=signal.direction,
+            )
 
         if settings.trading_dry_run:
             quote = self._resolve_quote_amount(signal)
@@ -138,6 +157,9 @@ class TradeExecutor:
                 symbol=signal.symbol,
                 direction=signal.direction,
             )
+
+    def _fetch_candles(self, signal: DIVAPSignal):
+        return self._source.fetch_ohlcv(signal.symbol, signal.timeframe, limit=100)
 
     def _resolve_quote_amount(self, signal: DIVAPSignal) -> Decimal:
         _, execution, _ = get_active_execution_profile()

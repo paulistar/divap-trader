@@ -21,3 +21,8 @@ scan:
   timeframes: ["15m", "1h"]
   symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
   monitor_interval_seconds: 120
+exit:
+  take_profit_fibo: "1.0"
+  time_stop_candles: 8
+  time_stop_min_move_pct: "0.003"
+  time_stop_timeframes: ["15m"]
