@@ -158,12 +158,13 @@
   <div id="login-view" class="wrap">
     <div class="login-panel">
       <h2>DIVAP Trader</h2>
-      <p>Informe sua API Key para carregar alertas, trades e métricas.</p>
+      <p>Informe a <strong>API_KEY</strong> do Easypanel (Environment → <code>API_KEY</code>).</p>
       <form id="login-form">
-        <input type="password" id="api-key-input" placeholder="X-API-Key" autocomplete="off" required />
+        <div class="error-banner" id="login-error"></div>
+        <input type="password" id="api-key-input" placeholder="API_KEY ou token do painel" autocomplete="off" required />
         <button type="submit">Entrar no painel</button>
       </form>
-      <p style="margin-top:1rem;font-size:0.75rem;">A chave fica salva apenas no seu navegador (localStorage).</p>
+      <p style="margin-top:1rem;font-size:0.75rem;">Login seguro por cookie — a chave não fica salva no navegador.</p>
     </div>
   </div>
 
@@ -237,25 +238,16 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "divap_api_key";
     const REFRESH_MS = 30000;
     let refreshTimer = null;
 
     const loginView = document.getElementById("login-view");
     const appView = document.getElementById("app-view");
     const errorBanner = document.getElementById("error-banner");
+    const loginError = document.getElementById("login-error");
 
-    function getApiKey() {
-      return localStorage.getItem(STORAGE_KEY) || "";
-    }
-
-    function setApiKey(key) {
-      localStorage.setItem(STORAGE_KEY, key);
-    }
-
-    function clearApiKey() {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    // Limpa chave antiga (versão anterior usava localStorage)
+    try { localStorage.removeItem("divap_api_key"); } catch (_) {}
 
     function showError(msg) {
       errorBanner.textContent = msg;
@@ -266,16 +258,41 @@
       errorBanner.classList.remove("show");
     }
 
-    async function api(path) {
-      const headers = {};
-      const key = getApiKey();
-      if (key) headers["X-API-Key"] = key;
-      const res = await fetch(path, { headers });
+    function showLoginError(msg) {
+      if (!loginError) return;
+      loginError.textContent = msg;
+      loginError.classList.add("show");
+    }
+
+    function hideLoginError() {
+      if (!loginError) return;
+      loginError.classList.remove("show");
+    }
+
+    async function fetchDashboard() {
+      const res = await fetch("/dashboard/data?limit=15", { credentials: "same-origin" });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || `Erro ${res.status} em ${path}`);
+        throw new Error(body.detail || body.error || `Erro ${res.status}`);
       }
-      return res.json();
+      return body;
+    }
+
+    async function login(secret) {
+      const res = await fetch("/dashboard/auth", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.detail || "Chave inválida");
+      }
+    }
+
+    async function logoutSession() {
+      await fetch("/dashboard/logout", { method: "POST", credentials: "same-origin" });
     }
 
     function fmtNum(val, digits = 2) {
@@ -307,18 +324,18 @@
 
     function renderBadges(health, stats) {
       const el = document.getElementById("status-badges");
-      const online = health?.data?.status === "ok";
-      const testnet = stats?.data?.trading_mode === "testnet";
-      const trading = stats?.data?.trading_enabled;
+      const online = health?.status === "ok";
+      const testnet = stats?.trading_mode === "testnet";
+      const trading = stats?.trading_enabled;
       el.innerHTML = `
         <span class="badge ${online ? "ok" : "off"}">${online ? "● Online" : "○ Offline"}</span>
-        <span class="badge ${testnet ? "warn" : ""}">${testnet ? "Testnet" : stats?.data?.trading_mode || "—"}</span>
+        <span class="badge ${testnet ? "warn" : ""}">${testnet ? "Testnet" : stats?.trading_mode || "—"}</span>
         <span class="badge ${trading ? "ok" : "off"}">Trading ${trading ? "ON" : "OFF"}</span>
       `;
     }
 
     function renderStats(stats) {
-      const d = stats?.data || {};
+      const d = stats || {};
       const pnl = Number(d.total_pnl_usdt || 0);
       const pnlClass = pnl > 0 ? "positive" : pnl < 0 ? "negative" : "";
       document.getElementById("stats-grid").innerHTML = `
@@ -332,7 +349,7 @@
     }
 
     function renderTrades(trades) {
-      const rows = trades?.data || [];
+      const rows = trades || [];
       const tbody = document.getElementById("trades-body");
       if (!rows.length) {
         tbody.innerHTML = '<tr><td colspan="9" class="empty">Nenhum trade executado ainda</td></tr>';
@@ -358,7 +375,7 @@
     }
 
     function renderAlerts(alerts) {
-      const rows = alerts?.data || [];
+      const rows = alerts || [];
       const tbody = document.getElementById("alerts-body");
       if (!rows.length) {
         tbody.innerHTML = '<tr><td colspan="9" class="empty">Nenhum alerta registrado</td></tr>';
@@ -380,24 +397,19 @@
     async function loadDashboard() {
       hideError();
       try {
-        const [health, stats, trades, alerts] = await Promise.all([
-          api("/health"),
-          api("/stats"),
-          api("/trades?limit=15"),
-          api("/alerts?limit=15"),
-        ]);
-        renderBadges(health, stats);
-        renderStats(stats);
-        renderTrades(trades);
-        renderAlerts(alerts);
+        const payload = await fetchDashboard();
+        const d = payload.data || {};
+        renderBadges(d.health, d.stats);
+        renderStats(d.stats);
+        renderTrades(d.trades);
+        renderAlerts(d.alerts);
         document.getElementById("footer-updated").textContent =
           "Atualizado: " + new Date().toLocaleString("pt-BR");
         document.getElementById("refresh-label").textContent = "Próximo refresh em 30s";
       } catch (err) {
         showError(err.message || "Falha ao carregar dados");
-        if (String(err.message).includes("401")) {
-          clearApiKey();
-          setTimeout(showLogin, 1500);
+        if (String(err.message).toLowerCase().includes("sessão") || String(err.message).includes("401")) {
+          setTimeout(showLogin, 1200);
         }
       }
     }
@@ -416,25 +428,36 @@
       if (refreshTimer) clearInterval(refreshTimer);
     }
 
-    document.getElementById("login-form").addEventListener("submit", (e) => {
+    document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();
+      hideLoginError();
       const key = document.getElementById("api-key-input").value.trim();
       if (!key) return;
-      setApiKey(key);
-      showApp();
+      try {
+        await login(key);
+        document.getElementById("api-key-input").value = "";
+        showApp();
+      } catch (err) {
+        showLoginError(err.message || "Chave inválida");
+      }
     });
 
     document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
-    document.getElementById("logout-btn").addEventListener("click", () => {
-      clearApiKey();
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      await logoutSession();
       showLogin();
     });
 
-    if (getApiKey()) {
-      showApp();
-    } else {
-      showLogin();
+    async function bootstrap() {
+      try {
+        await fetchDashboard();
+        showApp();
+      } catch (_) {
+        showLogin();
+      }
     }
+
+    bootstrap();
   </script>
 </body>
 </html>

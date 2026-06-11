@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     app_debug: bool = Field(default=True, alias="APP_DEBUG")
     api_key: str = Field(default="change-me", alias="API_KEY")
+    dashboard_token: str = Field(default="", alias="DASHBOARD_TOKEN")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
     database_url: str = Field(
