@@ -1,0 +1,24 @@
+# ADR 004: Domínio trade.martstudiosbr.com.br porta 80
+
+**Status:** Aceito  
+**Data:** 2026-06-11
+
+## Contexto
+
+Deploy na VPS Mart Studios com Cloudflare na frente. Domínio definido pelo operador.
+
+## Decisão
+
+- **Domínio:** `trade.martstudiosbr.com.br`
+- **Porta pública:** **80/443** (Easypanel Traefik na VPS — mesma infra de `chat.`, `mcp.`, etc.)
+- **App Docker:** porta **8000** no container (mapeada pelo Traefik)
+- **Cloudflare:** registro A `trade` → IP VPS, proxy ativado
+- **SSL:** Cloudflare + Traefik Easypanel (visitante sempre HTTPS)
+- **Caddy standalone:** apenas fallback se VPS sem Easypanel (`deploy/Caddyfile`)
+
+## Consequências
+
+- Positivo: alinhado à infra Mart Studios existente, sem conflito na :80
+- Positivo: deploy via Compose no projeto `martstudios` do Easypanel
+- Negativo: depende do painel Easypanel para roteamento de domínio
+- Evolução: auto-deploy GitHub após push no repo `divap-trader`

@@ -1,0 +1,19 @@
+# DIVAP Trader — FALLBACK (VPS sem Easypanel)
+# Na VPS Mart Studios o Traefik/Easypanel já ocupa a :80 — use Easypanel, não este arquivo.
+# Domínio: trade.martstudiosbr.com.br
+# Cloudflare: proxy laranja ON, SSL Flexible ou Full (origem HTTP :80)
+
+:80 {
+    @trade host trade.martstudiosbr.com.br
+    handle @trade {
+        reverse_proxy 127.0.0.1:8000
+
+        header {
+            X-Content-Type-Options "nosniff"
+            X-Frame-Options "DENY"
+            Referrer-Policy "strict-origin-when-cross-origin"
+        }
+    }
+
+    respond "Not Found" 404
+}

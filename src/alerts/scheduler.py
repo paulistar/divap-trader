@@ -1,0 +1,84 @@
+"""Celery tasks for periodic DIVAP scanning."""
+
+import logging
+
+from src.alerts.formatter import format_divap_alert
+from src.alerts.telegram import TelegramNotifier
+from src.analysis.llm_analyzer import LLMAnalyzer
+from src.core.config import settings
+from src.core.constants import DEFAULT_SYMBOLS, DEFAULT_TIMEFRAMES, PRIORITY_TIMEFRAMES
+from src.core.celery_app import celery_app
+from src.core.exceptions import AnalysisError, ExchangeError
+from src.data.repositories.alert_repo import AlertRepository
+from src.data.repositories.candle_repo import CandleRepository
+from src.data.sources.binance import BinanceSource
+from src.detection.divap_scanner import DIVAPScanner
+
+logger = logging.getLogger(__name__)
+
+CANDLE_LIMIT = 100
+
+
+def run_divap_scan(
+    symbols: tuple[str, ...] | None = None,
+    timeframes: tuple[str, ...] | None = None,
+    use_llm: bool = True,
+    notify: bool = True,
+) -> dict[str, int | list[str]]:
+    """Scan symbols/timeframes, persist alerts, optional LLM + Telegram."""
+    symbols = symbols or DEFAULT_SYMBOLS
+    timeframes = timeframes or DEFAULT_TIMEFRAMES
+
+    source = BinanceSource()
+    candle_repo = CandleRepository()
+    alert_repo = AlertRepository()
+    scanner = DIVAPScanner()
+    notifier = TelegramNotifier()
+    analyzer = LLMAnalyzer()
+
+    signals_found: list[str] = []
+    errors = 0
+
+    for symbol in symbols:
+        for timeframe in timeframes:
+            try:
+                candles = source.fetch_ohlcv(symbol, timeframe, limit=CANDLE_LIMIT)
+                candle_repo.upsert_many(candles)
+                signal = scanner.scan(symbol, timeframe, candles)
+            except ExchangeError as exc:
+                logger.error("Scan failed %s %s: %s", symbol, timeframe, exc)
+                errors += 1
+                continue
+
+            if signal is None:
+                continue
+
+            alert_id = alert_repo.save_signal(signal)
+            key = f"{symbol}:{timeframe}"
+            signals_found.append(key)
+            logger.info("DIVAP signal detected: %s (alert #%s)", key, alert_id)
+
+            analysis_text: str | None = None
+            if use_llm and settings.openai_api_key:
+                try:
+                    analysis_text = analyzer.analyze(signal)
+                    alert_repo.save_analysis(alert_id, analysis_text, settings.openai_model)
+                except AnalysisError as exc:
+                    logger.warning("LLM analysis skipped for %s: %s", key, exc)
+
+            if notify and notifier.is_configured():
+                message = format_divap_alert(signal, analysis_text)
+                notifier.send(message)
+
+    return {
+        "signals": len(signals_found),
+        "errors": errors,
+        "details": signals_found,
+    }
+
+
+@celery_app.task(name="src.alerts.scheduler.scan_all_symbols")
+def scan_all_symbols() -> dict[str, int | list[str]]:
+    """Periodic scan — priority timeframes first."""
+    logger.info("Starting DIVAP periodic scan")
+    return run_divap_scan(timeframes=PRIORITY_TIMEFRAMES)
