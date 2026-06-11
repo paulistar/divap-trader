@@ -23,6 +23,10 @@ Header `X-API-Key` em produção (atrás do Cloudflare).
 
 Health check.
 
+### `GET /dashboard`
+
+Painel web simples para acompanhar alertas, trades e métricas. Página pública; ao abrir, informe a `X-API-Key` (salva no navegador). Auto-refresh a cada 30s.
+
 **Resposta:**
 ```json
 {

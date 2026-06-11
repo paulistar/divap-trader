@@ -42,6 +42,7 @@ pytest
 | Endpoint | Descrição |
 |----------|-----------|
 | `GET /health` | Health check (público) |
+| `GET /dashboard` | Painel web de acompanhamento (público; API key no browser) |
 | `POST /analyze/{symbol}` | Scan DIVAP + IA opcional |
 | `POST /analyze/scan/all` | Scan completo |
 | `GET /alerts` | Lista alertas |

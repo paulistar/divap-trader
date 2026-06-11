@@ -7,6 +7,7 @@ from src.api.routes import (
     alerts,
     analysis,
     context,
+    dashboard,
     health,
     signal_analysis,
     signals,
@@ -25,6 +26,7 @@ app = FastAPI(
 )
 
 app.add_middleware(RequestLoggingMiddleware)
+app.include_router(dashboard.router)
 app.include_router(health.router)
 app.include_router(analysis.router)
 app.include_router(context.router)
