@@ -51,6 +51,7 @@ SELECT * FROM alerts
 WHERE (%s IS NULL OR symbol = %s)
   AND (%s IS NULL OR timeframe = %s)
   AND (%s IS NULL OR confidence = %s)
+  AND (%s IS NULL OR context_verdict = %s)
   AND (%s IS NULL OR created_at >= NOW() - make_interval(hours => %s))
 ORDER BY created_at DESC
 LIMIT %s OFFSET %s
@@ -187,11 +188,12 @@ class AlertRepository:
         symbol: str | None = None,
         timeframe: str | None = None,
         confidence: str | None = None,
+        context_verdict: str | None = None,
         within_hours: int | None = None,
     ) -> list[AlertRecord]:
         with self._connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                if symbol or timeframe or confidence or within_hours:
+                if symbol or timeframe or confidence or context_verdict or within_hours:
                     cur.execute(
                         SELECT_ALERTS_FILTERED_SQL,
                         (
@@ -201,6 +203,8 @@ class AlertRepository:
                             timeframe,
                             confidence,
                             confidence,
+                            context_verdict,
+                            context_verdict,
                             within_hours,
                             within_hours or 0,
                             limit,

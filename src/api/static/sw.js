@@ -1,4 +1,4 @@
-const CACHE = "divap-dashboard-v2";
+const CACHE = "divap-dashboard-v3";
 const SHELL = ["/dashboard/static/icon.svg"];
 
 const NETWORK_ONLY_PREFIXES = [
@@ -12,6 +12,8 @@ const NETWORK_ONLY_PREFIXES = [
   "/dashboard/scan",
   "/dashboard/auth",
   "/dashboard/bankroll",
+  "/dashboard/push",
+  "/dashboard/strategy/insights",
 ];
 
 function isStaticAsset(pathname) {
@@ -75,3 +77,34 @@ async function networkFirst(request) {
     throw _;
   }
 }
+
+self.addEventListener("push", (event) => {
+  let data = { title: "DIVAP Trader", body: "Novo sinal", url: "/dashboard" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch (_) { /* keep defaults */ }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/dashboard/static/icon.svg",
+      badge: "/dashboard/static/icon.svg",
+      tag: "divap-high-signal",
+      data: { url: data.url || "/dashboard" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/dashboard";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.includes("/dashboard") && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
+});

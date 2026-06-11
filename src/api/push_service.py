@@ -1,0 +1,79 @@
+"""Web Push notifications for high-confidence DIVAP signals."""
+
+from __future__ import annotations
+
+import json
+import logging
+
+from src.api.push_subscriptions import list_subscriptions, remove_subscription, save_subscription
+from src.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def vapid_public_key() -> str | None:
+    key = settings.vapid_public_key.strip()
+    return key or None
+
+
+def vapid_configured() -> bool:
+    return bool(settings.vapid_public_key.strip() and settings.vapid_private_key.strip())
+
+
+def store_subscription(subscription: dict) -> None:
+    endpoint = subscription.get("endpoint")
+    if not endpoint:
+        return
+    save_subscription(endpoint, subscription)
+
+
+def delete_subscription(endpoint: str) -> None:
+    if endpoint:
+        remove_subscription(endpoint)
+
+
+def notify_high_confidence_signal(
+    *,
+    symbol: str,
+    timeframe: str,
+    direction: str,
+    alert_id: int,
+) -> int:
+    """Send push to all subscribers. Returns count sent."""
+    if not vapid_configured():
+        return 0
+
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:
+        logger.warning("pywebpush not installed — push disabled")
+        return 0
+
+    side = "Compra" if direction == "buy" else "Venda"
+    payload = json.dumps(
+        {
+            "title": "DIVAP — sinal alta confiança",
+            "body": f"{symbol} {timeframe} · {side}",
+            "url": "/dashboard",
+            "alert_id": alert_id,
+        }
+    )
+    sent = 0
+    for sub in list_subscriptions():
+        endpoint = sub.get("endpoint", "")
+        try:
+            webpush(
+                subscription_info=sub,
+                data=payload,
+                vapid_private_key=settings.vapid_private_key,
+                vapid_claims={"sub": settings.vapid_claims_sub},
+            )
+            sent += 1
+        except WebPushException as exc:
+            status = getattr(exc.response, "status_code", None) if exc.response else None
+            if status in (404, 410):
+                remove_subscription(endpoint)
+            logger.warning("Push failed %s: %s", endpoint[:48], exc)
+        except Exception as exc:
+            logger.warning("Push error: %s", exc)
+    return sent

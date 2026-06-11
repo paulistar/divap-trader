@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
     telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
 
+    vapid_public_key: str = Field(default="", alias="VAPID_PUBLIC_KEY")
+    vapid_private_key: str = Field(default="", alias="VAPID_PRIVATE_KEY")
+    vapid_claims_sub: str = Field(
+        default="mailto:trade@martstudiosbr.com.br",
+        alias="VAPID_CLAIMS_SUB",
+    )
+
     @field_validator(
         "api_key",
         "dashboard_token",

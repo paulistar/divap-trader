@@ -6,6 +6,12 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from src.api.push_service import (
+    delete_subscription,
+    store_subscription,
+    vapid_public_key,
+)
+
 from src.bankroll.service import (
     build_bankroll_payload,
     build_profile_insights_payload,
@@ -49,6 +55,14 @@ class DashboardAuthBody(BaseModel):
 class BankrollUpdateBody(BaseModel):
     active_profile_id: str | None = Field(default=None, pattern=r"^[a-z_]+$")
     monthly_target_usdt: Decimal | None = Field(default=None, ge=0)
+
+
+class PushSubscribeBody(BaseModel):
+    subscription: dict = Field(description="PushSubscription JSON from browser")
+
+
+class PushUnsubscribeBody(BaseModel):
+    endpoint: str = Field(min_length=1)
 
 
 async def require_dashboard_session(request: Request) -> None:
@@ -146,18 +160,23 @@ async def dashboard_data(
     symbol: str | None = None,
     timeframe: str | None = None,
     confidence: str | None = None,
+    verdict: str | None = None,
     hours: int | None = Query(default=None, ge=1, le=168),
 ) -> ApiResponse[dict]:
     alert_repo = AlertRepository()
     trade_repo = TradeRepository()
 
     sym = symbol.upper().replace("/", "") if symbol else None
+    verdict_filter = verdict.lower() if verdict else None
+    if verdict_filter and verdict_filter not in ("confirm", "caution", "reject"):
+        raise HTTPException(status_code=400, detail="Veredito inválido")
     alerts = alert_repo.list_alerts(
         limit=limit,
         offset=0,
         symbol=sym,
         timeframe=timeframe,
         confidence=confidence,
+        context_verdict=verdict_filter,
         within_hours=hours,
     )
     open_trades = trade_repo.list_open_trades()
@@ -176,6 +195,32 @@ async def dashboard_data(
             "pnl_series": build_pnl_series(),
         },
     )
+
+
+@router.get("/dashboard/push/vapid-key", include_in_schema=False)
+async def dashboard_push_vapid_key(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    key = vapid_public_key()
+    return ApiResponse(success=True, data={"public_key": key, "configured": key is not None})
+
+
+@router.post("/dashboard/push/subscribe", include_in_schema=False)
+async def dashboard_push_subscribe(
+    body: PushSubscribeBody,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    store_subscription(body.subscription)
+    return ApiResponse(success=True, data={"subscribed": True})
+
+
+@router.post("/dashboard/push/unsubscribe", include_in_schema=False)
+async def dashboard_push_unsubscribe(
+    body: PushUnsubscribeBody,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    delete_subscription(body.endpoint)
+    return ApiResponse(success=True, data={"subscribed": False})
 
 
 @router.get("/dashboard/trading-readiness", include_in_schema=False)

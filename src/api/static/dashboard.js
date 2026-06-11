@@ -2,6 +2,23 @@ const REFRESH_MS = 30000;
 
 let refreshTimer = null;
 let lastData = null;
+let lastHighAlertId = Number(localStorage.getItem("divap-last-alert-id") || 0);
+
+const GATE_LABELS = {
+  trading_disabled: "Trading desligado",
+  testnet_required: "Testnet não configurado",
+  live_mode_requires_production_keys: "Modo live exige chaves produção",
+  confidence_below_threshold: "Confiança abaixo do mínimo",
+  timeframe_not_allowed_for_profile: "Timeframe não permitido",
+  context_reject: "Contexto reject",
+  monthly_goal_protected: "Modo protegido (meta)",
+  no_targets: "Sem alvos",
+  max_open_trades: "Máximo de trades abertos",
+  duplicate_open_trade: "Trade duplicado aberto",
+  insufficient_balance: "Saldo insuficiente",
+  insufficient_base_balance: "Saldo base insuficiente",
+  zero_fill: "Ordem sem fill",
+};
 
 const loginView = document.getElementById("login-view");
 const appView = document.getElementById("app-view");
@@ -43,10 +60,12 @@ function buildQuery() {
   const symbol = document.getElementById("filter-symbol")?.value;
   const tf = document.getElementById("filter-tf")?.value;
   const conf = document.getElementById("filter-conf")?.value;
+  const verdict = document.getElementById("filter-verdict")?.value;
   const last24 = document.getElementById("filter-24h")?.checked;
   if (symbol) params.set("symbol", symbol);
   if (tf) params.set("timeframe", tf);
   if (conf) params.set("confidence", conf);
+  if (verdict) params.set("verdict", verdict);
   if (last24) params.set("hours", "24");
   return params.toString();
 }
@@ -194,7 +213,110 @@ function drawMiniChart(canvas, entry, stop, targets) {
   ctx.fill();
 }
 
-function renderBadges(health, stats, scan) {
+function renderGoalProtected(bankroll) {
+  const banner = document.getElementById("goal-protected-banner");
+  const panel = document.getElementById("bankroll-panel");
+  const protectedMode = bankroll?.protected_mode || bankroll?.goal_reached;
+  if (banner) banner.classList.toggle("hidden", !protectedMode);
+  if (panel) panel.classList.toggle("goal-reached", !!protectedMode);
+}
+
+function renderScanSummary(scan) {
+  const panel = document.getElementById("scan-summary-panel");
+  if (!panel) return;
+  const summary = scan?.summary || {};
+  const blocks = summary.gate_blocks || {};
+  const blockEntries = Object.entries(blocks).sort((a, b) => b[1] - a[1]);
+  const blocksHtml = blockEntries.length
+    ? `<ul class="gate-blocks-list">${blockEntries.map(([k, n]) =>
+        `<li><span>${gateLabel(k)}</span><span class="count">${n}×</span></li>`
+      ).join("")}</ul>`
+    : '<div class="empty" style="padding:0.75rem">Nenhum bloqueio registrado no último scan.</div>';
+  panel.innerHTML = `
+    <div class="scan-summary-stats">
+      <div class="scan-stat"><div class="num">${summary.pairs_scanned ?? "—"}</div><div class="lbl">Pares analisados</div></div>
+      <div class="scan-stat"><div class="num">${summary.setups_detected ?? 0}</div><div class="lbl">Setups detectados</div></div>
+      <div class="scan-stat"><div class="num">${summary.signals_saved ?? scan?.last_signals ?? 0}</div><div class="lbl">Alertas novos</div></div>
+      <div class="scan-stat"><div class="num">${summary.trades_executed ?? 0}</div><div class="lbl">Trades executados</div></div>
+      <div class="scan-stat"><div class="num">${summary.duplicates_skipped ?? 0}</div><div class="lbl">Duplicados ignorados</div></div>
+    </div>
+    <h3 style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.45rem;">Bloqueios por gate</h3>
+    ${blocksHtml}
+  `;
+}
+
+function gateLabel(key) {
+  return GATE_LABELS[key] || key.replace(/_/g, " ");
+}
+
+function checkHighAlertNotifications(alerts) {
+  if (!alerts?.length || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  const high = alerts.filter((a) => a.confidence === "high");
+  if (!high.length) return;
+  const newestId = Math.max(...high.map((a) => a.id));
+  if (newestId <= lastHighAlertId) return;
+  const a = high.find((x) => x.id === newestId) || high[0];
+  if (localStorage.getItem("divap-notify-enabled") === "1") {
+    try {
+      new Notification("DIVAP — sinal alta confiança", {
+        body: `${a.symbol} ${a.timeframe} · ${a.direction === "buy" ? "Compra" : "Venda"}`,
+        icon: "/dashboard/static/icon.svg",
+        tag: `divap-alert-${a.id}`,
+      });
+    } catch (_) { /* ignore */ }
+  }
+  lastHighAlertId = newestId;
+  localStorage.setItem("divap-last-alert-id", String(lastHighAlertId));
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+async function subscribePush() {
+  if (!("serviceWorker" in navigator)) {
+    showError("Push não suportado neste navegador");
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") {
+    showError("Permissão de notificação negada");
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const vapidRes = await fetch("/dashboard/push/vapid-key", { credentials: "same-origin" });
+  const vapidBody = await vapidRes.json().catch(() => ({}));
+  const publicKey = vapidBody.data?.public_key;
+  if (publicKey && "PushManager" in window) {
+    try {
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+      await fetch("/dashboard/push/subscribe", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+      localStorage.setItem("divap-notify-enabled", "1");
+      document.getElementById("push-btn")?.classList.add("active");
+      showSuccess("Push ativado — alertas de alta confiança no celular");
+      return;
+    } catch (err) {
+      showError("Falha no push remoto: " + (err.message || "erro"));
+    }
+  }
+  localStorage.setItem("divap-notify-enabled", "1");
+  document.getElementById("push-btn")?.classList.add("active");
+  showSuccess("Notificações locais ativadas (com app aberto). Configure VAPID para push em background.");
+}
+
+function renderBadges(health, stats, scan, bankroll) {
   const el = document.getElementById("status-badges");
   const online = health?.status === "ok";
   const testnet = stats?.trading_mode === "testnet";
@@ -205,11 +327,13 @@ function renderBadges(health, stats, scan) {
     : scan?.beat_seconds_since != null
       ? `Beat inativo · último sinal há ${fmtDuration(scan.beat_seconds_since)}`
       : "Beat ainda sem heartbeat — aguarde ~1 min após deploy";
+  const protectedMode = bankroll?.protected_mode;
   el.innerHTML = `
     <span class="badge ${online ? "ok" : "off"}">${online ? "● Online" : "○ Offline"}</span>
     <span class="badge ${testnet ? "warn" : ""}">${testnet ? "Testnet" : stats?.trading_mode || "—"}</span>
     <span class="badge ${trading ? "ok" : "off"}">Trading ${trading ? "ON" : "OFF"}</span>
     <span class="badge ${beat ? "ok beat-pulse" : "off"}" title="${beatTitle.replace(/"/g, "&quot;")}">${beat ? "● Beat ativo" : "○ Beat inativo"}</span>
+    ${protectedMode ? '<span class="badge warn">🛡 Protegido</span>' : ""}
   `;
 }
 
@@ -393,18 +517,33 @@ function renderBankroll(bankroll, profilesPayload) {
   if (targetInput && b.monthly_target_usdt != null) targetInput.value = b.monthly_target_usdt;
 
   const progress = b.progress_pct != null ? Math.min(100, Number(b.progress_pct)) : 0;
+  const reached = b.protected_mode || b.goal_reached;
+  const monthlyPnl = Number(b.monthly_pnl_usdt || 0);
+  const target = Number(b.monthly_target_usdt || 0);
   const summary = document.getElementById("bankroll-summary");
+  renderGoalProtected(b);
   summary.innerHTML = `
     <div class="bankroll-grid">
-      <div class="bankroll-stat"><div class="label">PnL mês</div><div class="value">${fmtNum(b.monthly_pnl_usdt)} USDT</div></div>
+      <div class="bankroll-stat"><div class="label">PnL mês</div><div class="value ${monthlyPnl >= 0 ? "positive" : "negative"}">${fmtNum(b.monthly_pnl_usdt)} USDT</div></div>
       <div class="bankroll-stat"><div class="label">Meta mensal</div><div class="value">${b.monthly_target_usdt ? fmtNum(b.monthly_target_usdt) + " USDT" : "—"}</div></div>
       <div class="bankroll-stat"><div class="label">PnL semana</div><div class="value">${fmtNum(b.weekly_pnl_usdt)} USDT</div></div>
       <div class="bankroll-stat"><div class="label">Meta semanal*</div><div class="value">${b.weekly_target_usdt ? fmtNum(b.weekly_target_usdt) : "—"} USDT</div></div>
       <div class="bankroll-stat"><div class="label">Falta p/ meta (sem.)</div><div class="value">${b.weekly_needed_usdt ? fmtNum(b.weekly_needed_usdt) : "—"} USDT</div></div>
       <div class="bankroll-stat"><div class="label">Banca demo</div><div class="value">${b.balance_usdt ? fmtNum(b.balance_usdt) : "—"} USDT</div></div>
     </div>
-    ${b.monthly_target_usdt ? `<div class="progress-bar"><span style="width:${progress}%"></span></div><div class="subtitle">${progress}% da meta mensal</div>` : ""}
-    ${b.protected_mode ? '<div class="protected-banner">Meta mensal atingida — modo protegido: só entradas DIVAP alta confiança + contexto confirm.</div>' : ""}
+    ${b.monthly_target_usdt ? `
+    <div class="goal-progress-card ${reached ? "reached" : ""}">
+      <div class="goal-progress-header">
+        <span>Progresso da meta mensal</span>
+        <strong>${progress}%</strong>
+      </div>
+      <div class="progress-bar"><span style="width:${progress}%"></span></div>
+      <div class="subtitle" style="margin-top:0.35rem;">
+        ${reached
+          ? "🎯 Meta batida! Modo protegido ativo — operando só setups premium."
+          : `Faltam ${fmtNum(Math.max(0, target - monthlyPnl))} USDT para a meta.`}
+      </div>
+    </div>` : ""}
     <p class="subtitle" style="margin-top:0.5rem;">* Meta semanal = divisão proporcional da meta mensual pelas semanas do mês.</p>
   `;
 
@@ -437,11 +576,20 @@ async function loadProfileInsights(profilesPayload) {
   }
 }
 
+let lastBankrollCache = null;
+
 async function loadStrategyExtras() {
   try {
     const data = await fetchStrategy();
     if (!data) return;
+    lastBankrollCache = data.bankroll;
     renderBankroll(data.bankroll, data.profiles);
+    renderBadges(
+      lastData?.health,
+      lastData?.stats,
+      lastData?.scan,
+      data.bankroll,
+    );
     loadProfileInsights(data.profiles);
   } catch (_) {
     document.getElementById("profiles-grid").innerHTML =
@@ -755,11 +903,13 @@ async function loadDashboard() {
     const payload = await fetchDashboard();
     const d = payload.data || {};
     lastData = d;
-    renderBadges(d.health, d.stats, d.scan);
+    renderBadges(d.health, d.stats, d.scan, lastBankrollCache);
     renderScan(d.scan);
+    renderScanSummary(d.scan);
     renderOpenTrades(d.open_trades);
     renderTrades(d.trades);
     renderAlerts(d.alerts);
+    checkHighAlertNotifications(d.alerts);
     renderPnlChart(d.pnl_series);
     loadSlowExtras(d.stats);
     loadStrategyExtras();
@@ -791,7 +941,7 @@ function showLogin() {
 
 function registerPwa() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/dashboard/static/sw.js?v=2", { scope: "/dashboard/" })
+  navigator.serviceWorker.register("/dashboard/static/sw.js?v=3", { scope: "/dashboard/" })
     .then((reg) => {
       reg.addEventListener("updatefound", () => {
         const worker = reg.installing;
@@ -835,7 +985,32 @@ document.getElementById("scan-btn")?.addEventListener("click", triggerScan);
 document.getElementById("filter-symbol")?.addEventListener("change", loadDashboard);
 document.getElementById("filter-tf")?.addEventListener("change", loadDashboard);
 document.getElementById("filter-conf")?.addEventListener("change", loadDashboard);
+document.getElementById("filter-verdict")?.addEventListener("change", () => {
+  syncVerdictChips();
+  loadDashboard();
+});
 document.getElementById("filter-24h")?.addEventListener("change", loadDashboard);
+document.getElementById("push-btn")?.addEventListener("click", subscribePush);
+
+function syncVerdictChips() {
+  const val = document.getElementById("filter-verdict")?.value || "";
+  document.querySelectorAll("#verdict-chips .chip").forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.verdict === val);
+  });
+}
+
+document.getElementById("verdict-chips")?.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  const select = document.getElementById("filter-verdict");
+  if (select) select.value = chip.dataset.verdict || "";
+  syncVerdictChips();
+  loadDashboard();
+});
+
+if (localStorage.getItem("divap-notify-enabled") === "1") {
+  document.getElementById("push-btn")?.classList.add("active");
+}
 document.getElementById("save-bankroll-btn")?.addEventListener("click", async () => {
   try {
     const data = await saveBankroll(

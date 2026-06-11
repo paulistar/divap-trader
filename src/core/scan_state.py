@@ -19,7 +19,7 @@ def _client() -> redis.Redis:
     return redis.from_url(settings.redis_url, decode_responses=True)
 
 
-def record_scan(result: dict[str, int | list[str]]) -> None:
+def record_scan(result: dict[str, int | list[str] | dict]) -> None:
     client = _client()
     client.set(LAST_SCAN_KEY, datetime.now(UTC).isoformat())
     client.set(
@@ -29,6 +29,7 @@ def record_scan(result: dict[str, int | list[str]]) -> None:
                 "signals": result.get("signals", 0),
                 "errors": result.get("errors", 0),
                 "details": result.get("details", []),
+                "summary": result.get("summary", {}),
             }
         ),
     )
@@ -61,5 +62,6 @@ def get_scan_status() -> dict:
         "interval_seconds": SCAN_INTERVAL_SECONDS,
         "last_signals": last_result.get("signals", 0),
         "last_errors": last_result.get("errors", 0),
+        "summary": last_result.get("summary") or {},
         **get_beat_status(),
     }
