@@ -56,6 +56,38 @@ SCHEMA_STATEMENTS: list[str] = [
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS trades (
+        id               BIGSERIAL PRIMARY KEY,
+        alert_id         BIGINT REFERENCES alerts(id) ON DELETE SET NULL,
+        symbol           TEXT NOT NULL,
+        timeframe        TEXT NOT NULL,
+        direction        TEXT NOT NULL,
+        confidence       TEXT NOT NULL,
+        status           TEXT NOT NULL DEFAULT 'open',
+        entry_price      NUMERIC(20, 8),
+        exit_price       NUMERIC(20, 8),
+        stop_loss        NUMERIC(20, 8),
+        take_profit      NUMERIC(20, 8),
+        quantity         NUMERIC(30, 8),
+        quote_amount     NUMERIC(20, 8),
+        pnl_usdt         NUMERIC(20, 8),
+        pnl_pct          NUMERIC(10, 4),
+        fees_usdt        NUMERIC(20, 8) DEFAULT 0,
+        context_verdict  TEXT,
+        context_score    INTEGER,
+        exchange_order_id TEXT,
+        stop_order_id    TEXT,
+        tp_order_id      TEXT,
+        close_reason     TEXT,
+        trading_mode     TEXT NOT NULL DEFAULT 'testnet',
+        opened_at        TIMESTAMPTZ,
+        closed_at        TIMESTAMPTZ,
+        created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_trades_status ON trades (status)",
+    "CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades (symbol, created_at DESC)",
 ]
 
 

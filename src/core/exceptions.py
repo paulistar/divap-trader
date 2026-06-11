@@ -16,3 +16,7 @@ class ScannerError(DivapError):
 
 class AnalysisError(DivapError):
     """LLM analysis error."""
+
+
+class ExecutionError(DivapError):
+    """Trade execution error."""

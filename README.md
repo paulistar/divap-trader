@@ -4,8 +4,8 @@ Sistema inteligente de investimento baseado na metodologia **DIVAP** (Divergênc
 
 | Fase | Status |
 |------|--------|
-| **Fase 2** — Análise assistida por IA + alertas Telegram | ✅ MVP |
-| **Fase 3** — Execução automatizada | Roadmap |
+| **Fase 2** — Análise assistida por IA + alertas Telegram | ✅ |
+| **Fase 3** — Execução testnet + métricas + monitoramento | ✅ |
 
 ## Stack
 
@@ -47,6 +47,9 @@ pytest
 | `GET /alerts` | Lista alertas |
 | `GET /analysis/{id}` | Análise IA do alerta |
 | `GET /signals/history` | Histórico |
+| `GET /context/{symbol}` | Contexto de mercado (Apolo) |
+| `GET /trades` | Trades executados |
+| `GET /stats` | Win rate, PnL, trades abertos |
 
 Em produção (`APP_ENV=production`), envie header `X-API-Key`.
 
@@ -73,6 +76,8 @@ src/
 ├── detection/   # Scanner DIVAP
 ├── analysis/    # LLM + prompts Apolo
 ├── alerts/      # Telegram + scheduler
+├── context/     # Fear&Greed, macro, news, scoring
+├── execution/   # Broker testnet, risk, executor, monitor
 └── api/         # FastAPI
 ```
 

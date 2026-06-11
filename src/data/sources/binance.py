@@ -3,8 +3,8 @@ from decimal import Decimal
 
 import ccxt
 
-from src.core.config import settings
 from src.core.exceptions import ExchangeError
+from src.data.sources.binance_exchange import build_binance_exchange
 from src.data.models.candle import Candle
 from src.data.sources.interfaces import ExchangeSource
 
@@ -51,18 +51,8 @@ class BinanceSource(ExchangeSource):
     def __init__(self, exchange: ccxt.binance | None = None) -> None:
         self._exchange = exchange or self._build_exchange()
 
-    def _build_exchange(self) -> ccxt.binance:
-        exchange = ccxt.binance(
-            {
-                "apiKey": settings.binance_api_key or None,
-                "secret": settings.binance_api_secret or None,
-                "enableRateLimit": True,
-                "options": {"defaultType": "spot"},
-            }
-        )
-        if settings.binance_use_testnet:
-            exchange.set_sandbox_mode(True)
-        return exchange
+    def _build_exchange(self):
+        return build_binance_exchange()
 
     def fetch_ohlcv(
         self,

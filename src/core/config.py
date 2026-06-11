@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     context_news_limit: int = Field(default=5, alias="CONTEXT_NEWS_LIMIT")
     cryptopanic_api_key: str = Field(default="", alias="CRYPTOPANIC_API_KEY")
 
+    trading_enabled: bool = Field(default=False, alias="TRADING_ENABLED")
+    trading_mode: str = Field(default="testnet", alias="TRADING_MODE")
+    trading_min_confidence: str = Field(default="high", alias="TRADING_MIN_CONFIDENCE")
+    trading_block_on_context_reject: bool = Field(
+        default=True, alias="TRADING_BLOCK_ON_CONTEXT_REJECT"
+    )
+    trading_max_open_trades: int = Field(default=5, alias="TRADING_MAX_OPEN_TRADES")
+    trading_dry_run: bool = Field(default=False, alias="TRADING_DRY_RUN")
+
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o", alias="OPENAI_MODEL")
     openai_model_triage: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL_TRIAGE")

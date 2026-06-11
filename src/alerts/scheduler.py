@@ -4,6 +4,8 @@ import logging
 
 from src.alerts.formatter import format_divap_alert
 from src.alerts.telegram import TelegramNotifier
+from src.alerts.trade_formatter import format_trade_execution
+from src.execution.trade_executor import TradeExecutor
 from src.analysis.llm_analyzer import LLMAnalyzer
 from src.context.collector import collect_market_context
 from src.core.config import settings
@@ -36,6 +38,7 @@ def run_divap_scan(
     scanner = DIVAPScanner()
     notifier = TelegramNotifier()
     analyzer = LLMAnalyzer()
+    executor = TradeExecutor()
 
     signals_found: list[str] = []
     errors = 0
@@ -74,6 +77,15 @@ def run_divap_scan(
             if notify and notifier.is_configured():
                 message = format_divap_alert(signal, analysis_text, market_context)
                 notifier.send(message)
+
+            if settings.trading_enabled:
+                trade_result = executor.try_execute(signal, alert_id, market_context)
+                if trade_result.executed or trade_result.reason not in (
+                    "trading_disabled",
+                    "confidence_below_threshold",
+                ):
+                    if notify and notifier.is_configured():
+                        notifier.send(format_trade_execution(trade_result))
 
     return {
         "signals": len(signals_found),

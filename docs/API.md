@@ -72,3 +72,19 @@ Análise IA vinculada ao alerta.
 ### `GET /signals/history`
 
 Histórico de sinais (alias de `/alerts`).
+
+### `GET /trades`
+
+Lista trades executados (testnet/live). Query: `limit`, `offset`.
+
+**Campos `data`:** `symbol`, `direction`, `status` (open|closed|simulated), `entry_price`, `exit_price`, `pnl_usdt`, `pnl_pct`, `close_reason`, `trading_mode`.
+
+### `GET /trades/{id}`
+
+Detalhe de um trade.
+
+### `GET /stats`
+
+Métricas agregadas de performance.
+
+**Resposta `data`:** `closed_count`, `wins`, `losses`, `open_count`, `win_rate_pct`, `total_pnl_usdt`, `avg_pnl_pct`, `trading_enabled`, `trading_mode`.

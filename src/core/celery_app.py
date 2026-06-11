@@ -6,7 +6,7 @@ celery_app = Celery(
     "divap_trader",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["src.alerts.scheduler"],
+    include=["src.alerts.scheduler", "src.execution.tasks"],
 )
 
 celery_app.conf.update(
@@ -18,7 +18,11 @@ celery_app.conf.update(
     beat_schedule={
         "scan-divap-setups": {
             "task": "src.alerts.scheduler.scan_all_symbols",
-            "schedule": 900.0,  # 15 min — ajustar por timeframe no Sprint 4
+            "schedule": 900.0,  # 15 min
+        },
+        "monitor-open-trades": {
+            "task": "src.execution.tasks.monitor_open_trades",
+            "schedule": 300.0,  # 5 min
         },
     },
 )
