@@ -11,6 +11,7 @@ def test_caixa_rapido_includes_15m_and_fast_interval() -> None:
     profile = load_profile("caixa_rapido")
     assert profile is not None
     assert profile.scan.interval_seconds == 300
+    assert profile.scan.monitor_interval_seconds == 120
     assert "15m" in profile.scan.timeframes
     assert "1h" in profile.scan.timeframes
     assert profile.scan.symbols is not None
@@ -30,6 +31,7 @@ def test_should_run_scan_when_never_scanned() -> None:
         profile_id="caixa_rapido",
         profile_name="Caixa rápido",
         interval_seconds=300,
+        monitor_interval_seconds=120,
         timeframes=("15m", "1h"),
         symbols=("BTCUSDT", "ETHUSDT"),
     )
@@ -41,6 +43,7 @@ def test_should_run_scan_respects_interval() -> None:
         profile_id="divap",
         profile_name="DIVAP",
         interval_seconds=900,
+        monitor_interval_seconds=300,
         timeframes=("1h",),
         symbols=("BTCUSDT",),
     )
@@ -61,3 +64,4 @@ def test_get_active_scan_plan_uses_bankroll_profile() -> None:
             plan = get_active_scan_plan()
     assert plan.profile_id == "caixa_rapido"
     assert "15m" in plan.timeframes
+    assert plan.monitor_interval_seconds == 120

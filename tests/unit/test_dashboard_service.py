@@ -38,6 +38,7 @@ def test_record_and_get_scan_status() -> None:
         profile_id="divap",
         profile_name="DIVAP",
         interval_seconds=900,
+        monitor_interval_seconds=300,
         timeframes=("1h", "4h", "1d"),
         symbols=("BTCUSDT",),
     )
@@ -50,11 +51,16 @@ def test_record_and_get_scan_status() -> None:
         "2026-06-11T12:00:00+00:00",
         '{"signals": 2, "errors": 0}',
         None,
+        None,
+        None,
     ]
     with patch("src.core.scan_state._client", return_value=mock_client):
         with patch("src.core.beat_state._client", return_value=mock_client):
             with patch("src.core.scan_state.get_active_scan_plan", return_value=plan):
-                status = get_scan_status()
+                with patch("src.core.monitor_state.get_active_scan_plan", return_value=plan):
+                    with patch("src.core.monitor_state._client", return_value=mock_client):
+                        status = get_scan_status()
         assert status["last_signals"] == 2
         assert status["interval_seconds"] == 900
         assert status["active_profile_id"] == "divap"
+        assert status["monitor_interval_seconds"] == 300

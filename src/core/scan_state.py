@@ -9,6 +9,7 @@ import redis
 
 from src.core.beat_state import get_beat_status
 from src.core.config import settings
+from src.core.monitor_state import get_monitor_status
 from src.core.scan_plan import get_active_scan_plan
 
 BEAT_TICK_SECONDS = 300
@@ -93,5 +94,6 @@ def get_scan_status() -> dict:
         "last_errors": last_result.get("errors", 0),
         "last_skipped": last_result.get("skipped", False),
         "summary": last_result.get("summary") or {},
+        **get_monitor_status(),
         **get_beat_status(),
     }

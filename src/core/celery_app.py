@@ -22,7 +22,7 @@ celery_app.conf.update(
         },
         "monitor-open-trades": {
             "task": "src.execution.tasks.monitor_open_trades",
-            "schedule": 300.0,  # 5 min
+            "schedule": 60.0,  # 1 min tick — profile throttles actual monitor
         },
         "beat-heartbeat": {
             "task": "src.execution.tasks.beat_heartbeat",

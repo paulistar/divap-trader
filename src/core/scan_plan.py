@@ -16,6 +16,7 @@ class ScanPlan:
     profile_id: str
     profile_name: str
     interval_seconds: int
+    monitor_interval_seconds: int
     timeframes: tuple[str, ...]
     symbols: tuple[str, ...]
 
@@ -35,6 +36,7 @@ def get_active_scan_plan() -> ScanPlan:
             profile_id="divap",
             profile_name="DIVAP",
             interval_seconds=900,
+            monitor_interval_seconds=300,
             timeframes=("1h", "4h", "1d"),
             symbols=DEFAULT_SYMBOLS,
         )
@@ -42,9 +44,24 @@ def get_active_scan_plan() -> ScanPlan:
         profile_id=profile.id,
         profile_name=profile.name,
         interval_seconds=profile.scan.interval_seconds,
+        monitor_interval_seconds=profile.scan.monitor_interval_seconds,
         timeframes=profile.scan.timeframes,
         symbols=_resolve_symbols(profile),
     )
+
+
+def should_run_interval(
+    interval_seconds: int,
+    last_run_at: datetime | None,
+    now: datetime | None = None,
+) -> bool:
+    if last_run_at is None:
+        return True
+    current = now or datetime.now(UTC)
+    if last_run_at.tzinfo is None:
+        last_run_at = last_run_at.replace(tzinfo=UTC)
+    elapsed = (current - last_run_at).total_seconds()
+    return elapsed >= interval_seconds
 
 
 def should_run_scan(
@@ -52,10 +69,4 @@ def should_run_scan(
     last_scan_at: datetime | None,
     now: datetime | None = None,
 ) -> bool:
-    if last_scan_at is None:
-        return True
-    current = now or datetime.now(UTC)
-    if last_scan_at.tzinfo is None:
-        last_scan_at = last_scan_at.replace(tzinfo=UTC)
-    elapsed = (current - last_scan_at).total_seconds()
-    return elapsed >= plan.interval_seconds
+    return should_run_interval(plan.interval_seconds, last_scan_at, now)

@@ -665,11 +665,13 @@ function renderScan(scan) {
   const since = s.seconds_since_last != null ? `há ${fmtDuration(s.seconds_since_last)}` : "nunca";
   const until = s.seconds_until_next != null ? `~${fmtDuration(s.seconds_until_next)}` : "—";
   const interval = s.interval_seconds ? Math.round(s.interval_seconds / 60) : 15;
+  const monInterval = s.monitor_interval_seconds ? Math.round(s.monitor_interval_seconds / 60) : 5;
+  const monUntil = s.seconds_until_next_monitor != null ? `~${fmtDuration(s.seconds_until_next_monitor)}` : "—";
   const profile = s.active_profile_name || "—";
   const tfs = (s.scan_timeframes || []).join(", ") || "—";
   const beat = s.beat_active ? "beat OK" : "beat —";
   document.getElementById("scan-status").textContent =
-    `Perfil ${profile} · TFs ${tfs} · último scan ${since} · próximo em ${until} · a cada ${interval} min · sinais: ${s.last_signals ?? 0} · ${beat}`;
+    `Perfil ${profile} · scan ${tfs} a cada ${interval} min (próx. ${until}) · monitor a cada ${monInterval} min (próx. ${monUntil}) · sinais: ${s.last_signals ?? 0} · ${beat}`;
 }
 
 function tradeRow(t, clickable = true) {
