@@ -54,6 +54,13 @@ class Settings(BaseSettings):
         alias="VAPID_CLAIMS_SUB",
     )
 
+    @field_validator("vapid_private_key", mode="before")
+    @classmethod
+    def normalize_vapid_private_key(cls, value: object) -> object:
+        if isinstance(value, str) and "\\n" in value:
+            return value.replace("\\n", "\n")
+        return value
+
     @field_validator(
         "api_key",
         "dashboard_token",
