@@ -32,6 +32,46 @@ def delete_subscription(endpoint: str) -> None:
         remove_subscription(endpoint)
 
 
+def notify_test_push() -> int:
+    """Send a test push to all subscribers. Returns count sent."""
+    if not vapid_configured():
+        return 0
+
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:
+        logger.warning("pywebpush not installed — push disabled")
+        return 0
+
+    payload = json.dumps(
+        {
+            "title": "DIVAP — teste de push",
+            "body": "Se você viu isto, alertas de alta confiança estão ativos no celular.",
+            "url": "/dashboard",
+            "alert_id": 0,
+        }
+    )
+    sent = 0
+    for sub in list_subscriptions():
+        endpoint = sub.get("endpoint", "")
+        try:
+            webpush(
+                subscription_info=sub,
+                data=payload,
+                vapid_private_key=settings.vapid_private_key,
+                vapid_claims={"sub": settings.vapid_claims_sub},
+            )
+            sent += 1
+        except WebPushException as exc:
+            status = getattr(exc.response, "status_code", None) if exc.response else None
+            if status in (404, 410):
+                remove_subscription(endpoint)
+            logger.warning("Test push failed %s: %s", endpoint[:48], exc)
+        except Exception as exc:
+            logger.warning("Test push error: %s", exc)
+    return sent
+
+
 def notify_high_confidence_signal(
     *,
     symbol: str,

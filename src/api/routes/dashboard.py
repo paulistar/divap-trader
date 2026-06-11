@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from src.api.push_service import (
     delete_subscription,
+    notify_test_push,
     store_subscription,
     vapid_public_key,
 )
@@ -221,6 +222,19 @@ async def dashboard_push_unsubscribe(
 ) -> ApiResponse[dict]:
     delete_subscription(body.endpoint)
     return ApiResponse(success=True, data={"subscribed": False})
+
+
+@router.post("/dashboard/push/test", include_in_schema=False)
+async def dashboard_push_test(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    sent = notify_test_push()
+    message = (
+        f"Push de teste enviado para {sent} dispositivo(s)."
+        if sent
+        else "Nenhuma inscrição ativa. Toque em Push no painel e aceite as notificações."
+    )
+    return ApiResponse(success=True, data={"sent": sent, "message": message})
 
 
 @router.get("/dashboard/trading-readiness", include_in_schema=False)
