@@ -19,7 +19,7 @@ from src.bankroll.service import (
     build_profiles_payload,
 )
 
-from src.alerts.scheduler import run_divap_scan
+from src.alerts.scheduler import run_divap_scan, run_profile_scan
 from src.api.dashboard_auth import (
     COOKIE_NAME,
     SESSION_MAX_AGE,
@@ -38,7 +38,6 @@ from src.api.dashboard_service import (
 from src.api.routes.trades import _trade_to_dict
 from src.api.schemas import ApiResponse, HealthData
 from src.core.config import settings
-from src.core.scan_state import record_scan
 from src.data.repositories.alert_repo import AlertRepository
 from src.data.repositories.trade_repo import TradeRepository
 from src.trading.readiness import build_trading_readiness
@@ -367,6 +366,5 @@ async def dashboard_trade_detail(
 async def dashboard_trigger_scan(
     _: None = Depends(require_dashboard_session),
 ) -> ApiResponse[dict]:
-    result = run_divap_scan(notify=True)
-    record_scan(result)
+    result = run_profile_scan(notify=True)
     return ApiResponse(success=True, data=result)

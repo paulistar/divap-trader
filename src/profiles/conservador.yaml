@@ -16,3 +16,7 @@ advisor:
   min_avg_score: 50
   volatility: low
   needs_momentum: false
+scan:
+  interval_seconds: 1800
+  timeframes: ["4h", "1d"]
+  monitor_interval_seconds: 600

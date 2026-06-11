@@ -18,7 +18,7 @@ celery_app.conf.update(
     beat_schedule={
         "scan-divap-setups": {
             "task": "src.alerts.scheduler.scan_all_symbols",
-            "schedule": 900.0,  # 15 min
+            "schedule": 300.0,  # 5 min tick — profile throttles actual scan
         },
         "monitor-open-trades": {
             "task": "src.execution.tasks.monitor_open_trades",

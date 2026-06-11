@@ -14,8 +14,9 @@ from src.context.collector import collect_market_context
 from src.core.beat_state import record_beat_heartbeat
 from src.core.config import settings
 from src.core.scan_metrics import ScanMetrics
-from src.core.scan_state import record_scan
-from src.core.constants import DEFAULT_SYMBOLS, DEFAULT_TIMEFRAMES, PRIORITY_TIMEFRAMES
+from src.core.scan_plan import get_active_scan_plan, should_run_scan
+from src.core.scan_state import get_last_scan_at, record_scan
+from src.core.constants import DEFAULT_SYMBOLS, DEFAULT_TIMEFRAMES
 from src.core.celery_app import celery_app
 from src.core.exceptions import AnalysisError, ExchangeError
 from src.data.repositories.alert_repo import AlertRepository
@@ -137,11 +138,43 @@ def run_divap_scan(
     }
 
 
+def run_profile_scan(*, notify: bool = True) -> dict[str, int | list[str] | dict | str]:
+    """Manual or forced scan using the active profile universe."""
+    plan = get_active_scan_plan()
+    result = run_divap_scan(symbols=plan.symbols, timeframes=plan.timeframes, notify=notify)
+    result["profile_id"] = plan.profile_id
+    record_scan(plan.profile_id, result)
+    return result
+
+
 @celery_app.task(name="src.alerts.scheduler.scan_all_symbols")
-def scan_all_symbols() -> dict[str, int | list[str] | dict]:
-    """Periodic scan — priority timeframes first."""
+def scan_all_symbols() -> dict[str, int | list[str] | dict | bool | str]:
+    """Periodic scan — cadence and universe follow the active trading profile."""
     record_beat_heartbeat()
-    logger.info("Starting DIVAP periodic scan")
-    result = run_divap_scan(timeframes=PRIORITY_TIMEFRAMES)
-    record_scan(result)
+    plan = get_active_scan_plan()
+    last_at = get_last_scan_at(plan.profile_id)
+    if not should_run_scan(plan, last_at):
+        logger.info(
+            "Scan skipped for %s — interval %ss not elapsed",
+            plan.profile_id,
+            plan.interval_seconds,
+        )
+        return {
+            "skipped": True,
+            "profile_id": plan.profile_id,
+            "signals": 0,
+            "errors": 0,
+            "details": [],
+            "summary": {},
+        }
+
+    logger.info(
+        "Starting profile scan %s (%s) — TFs %s",
+        plan.profile_id,
+        plan.profile_name,
+        ",".join(plan.timeframes),
+    )
+    result = run_divap_scan(symbols=plan.symbols, timeframes=plan.timeframes)
+    result["profile_id"] = plan.profile_id
+    record_scan(plan.profile_id, result)
     return result

@@ -5,6 +5,14 @@ from decimal import Decimal
 
 
 @dataclass(frozen=True, slots=True)
+class ProfileScan:
+    interval_seconds: int
+    timeframes: tuple[str, ...]
+    symbols: tuple[str, ...] | None
+    monitor_interval_seconds: int
+
+
+@dataclass(frozen=True, slots=True)
 class ProfileAdvisorRules:
     ideal_fear_greed_min: int
     ideal_fear_greed_max: int
@@ -32,6 +40,7 @@ class TradingProfile:
     description: str
     execution: ProfileExecution
     advisor: ProfileAdvisorRules
+    scan: ProfileScan
 
 
 @dataclass(frozen=True, slots=True)

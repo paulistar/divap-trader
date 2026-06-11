@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from src.profiles.models import ProfileAdvisorRules, ProfileExecution, TradingProfile
+from src.profiles.models import ProfileAdvisorRules, ProfileExecution, ProfileScan, TradingProfile
 
 _PROFILES_DIR = Path(__file__).resolve().parent
 _DEFAULT_ORDER = ("divap", "conservador", "caixa_rapido", "agressivo")
@@ -15,6 +15,8 @@ _DEFAULT_ORDER = ("divap", "conservador", "caixa_rapido", "agressivo")
 def _parse_profile(data: dict) -> TradingProfile:
     execution_raw = data["execution"]
     advisor_raw = data["advisor"]
+    scan_raw = data.get("scan") or {}
+    allowed_tfs = tuple(execution_raw.get("allowed_timeframes", ("4h",)))
     return TradingProfile(
         id=data["id"],
         name=data["name"],
@@ -25,7 +27,7 @@ def _parse_profile(data: dict) -> TradingProfile:
             block_on_reject=bool(execution_raw.get("block_on_reject", True)),
             min_risk_reward=Decimal(str(execution_raw.get("min_risk_reward", "2.0"))),
             max_open_trades=int(execution_raw.get("max_open_trades", 5)),
-            allowed_timeframes=tuple(execution_raw.get("allowed_timeframes", ("4h",))),
+            allowed_timeframes=allowed_tfs,
             allocation_multiplier=Decimal(str(execution_raw.get("allocation_multiplier", "1.0"))),
         ),
         advisor=ProfileAdvisorRules(
@@ -35,6 +37,12 @@ def _parse_profile(data: dict) -> TradingProfile:
             min_avg_score=int(advisor_raw.get("min_avg_score", 35)),
             volatility=str(advisor_raw.get("volatility", "medium")),
             needs_momentum=bool(advisor_raw.get("needs_momentum", False)),
+        ),
+        scan=ProfileScan(
+            interval_seconds=int(scan_raw.get("interval_seconds", 900)),
+            timeframes=tuple(scan_raw.get("timeframes", allowed_tfs)),
+            symbols=tuple(scan_raw["symbols"]) if scan_raw.get("symbols") else None,
+            monitor_interval_seconds=int(scan_raw.get("monitor_interval_seconds", 300)),
         ),
     )
 

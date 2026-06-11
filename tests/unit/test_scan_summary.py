@@ -20,19 +20,27 @@ def test_record_scan_stores_summary() -> None:
     mock_client = MagicMock()
     with patch("src.core.scan_state._client", return_value=mock_client):
         record_scan(
+            "divap",
             {
                 "signals": 1,
                 "errors": 0,
                 "details": ["BTCUSDT:4h"],
                 "summary": {"pairs_scanned": 4, "gate_blocks": {}},
-            }
+            },
         )
-    payload = mock_client.set.call_args_list[1][0][1]
+    payload = mock_client.set.call_args_list[3][0][1]
     assert "summary" in payload
 
 
 def test_get_scan_status_includes_summary() -> None:
     mock_client = MagicMock()
+    plan = MagicMock(
+        profile_id="divap",
+        profile_name="DIVAP",
+        interval_seconds=900,
+        timeframes=("1h",),
+        symbols=("BTCUSDT",),
+    )
     mock_client.get.side_effect = [
         "2026-06-11T12:00:00+00:00",
         '{"signals": 1, "summary": {"pairs_scanned": 4}}',
@@ -40,5 +48,6 @@ def test_get_scan_status_includes_summary() -> None:
     ]
     with patch("src.core.scan_state._client", return_value=mock_client):
         with patch("src.core.beat_state._client", return_value=mock_client):
-            status = get_scan_status()
+            with patch("src.core.scan_state.get_active_scan_plan", return_value=plan):
+                status = get_scan_status()
     assert status["summary"]["pairs_scanned"] == 4

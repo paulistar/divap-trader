@@ -16,3 +16,8 @@ advisor:
   min_avg_score: 40
   volatility: high
   needs_momentum: true
+scan:
+  interval_seconds: 300
+  timeframes: ["15m", "1h"]
+  symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+  monitor_interval_seconds: 120

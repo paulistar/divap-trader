@@ -33,10 +33,18 @@ def test_execution_reason_medium_confidence() -> None:
 
 def test_record_and_get_scan_status() -> None:
     mock_client = MagicMock()
-    mock_client.get.side_effect = [None, None]
+    mock_client.get.side_effect = [None, None, None]
+    plan = MagicMock(
+        profile_id="divap",
+        profile_name="DIVAP",
+        interval_seconds=900,
+        timeframes=("1h", "4h", "1d"),
+        symbols=("BTCUSDT",),
+    )
     with patch("src.core.scan_state._client", return_value=mock_client):
-        record_scan({"signals": 2, "errors": 0, "details": ["BTCUSDT:4h"]})
-        assert mock_client.set.call_count == 2
+        with patch("src.core.scan_state.get_active_scan_plan", return_value=plan):
+            record_scan("divap", {"signals": 2, "errors": 0, "details": ["BTCUSDT:4h"]})
+            assert mock_client.set.call_count == 4
 
     mock_client.get.side_effect = [
         "2026-06-11T12:00:00+00:00",
@@ -45,6 +53,8 @@ def test_record_and_get_scan_status() -> None:
     ]
     with patch("src.core.scan_state._client", return_value=mock_client):
         with patch("src.core.beat_state._client", return_value=mock_client):
-            status = get_scan_status()
+            with patch("src.core.scan_state.get_active_scan_plan", return_value=plan):
+                status = get_scan_status()
         assert status["last_signals"] == 2
         assert status["interval_seconds"] == 900
+        assert status["active_profile_id"] == "divap"
