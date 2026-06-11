@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from src.context.models import MarketContext
 from src.detection.divap_scanner import DIVAPCriteria, DIVAPSignal
 from src.execution.gate import should_execute_trade
+from src.profiles.models import ProfileExecution
 
 
 def _signal(
@@ -49,10 +50,21 @@ def _context(verdict: str = "confirm") -> MarketContext:
     )
 
 
+def _execution() -> ProfileExecution:
+    return ProfileExecution(
+        min_confidence="high",
+        block_on_reject=True,
+        min_risk_reward=Decimal("2.0"),
+        max_open_trades=5,
+        allowed_timeframes=("15m", "1h", "4h", "1d"),
+        allocation_multiplier=Decimal("1"),
+    )
+
+
 def test_gate_blocks_when_trading_disabled() -> None:
     cfg = MagicMock()
     cfg.trading_enabled = False
-    allowed, reason = should_execute_trade(_signal(), _context(), cfg)
+    allowed, reason = should_execute_trade(_signal(), _context(), cfg, _execution())
     assert allowed is False
     assert reason == "trading_disabled"
 
@@ -64,7 +76,9 @@ def test_gate_blocks_medium_when_min_high() -> None:
     cfg.binance_use_testnet = True
     cfg.trading_min_confidence = "high"
     cfg.trading_block_on_context_reject = True
-    allowed, reason = should_execute_trade(_signal(confidence="medium"), _context(), cfg)
+    allowed, reason = should_execute_trade(
+        _signal(confidence="medium"), _context(), cfg, _execution()
+    )
     assert allowed is False
     assert reason == "confidence_below_threshold"
 
@@ -76,7 +90,7 @@ def test_gate_blocks_context_reject() -> None:
     cfg.binance_use_testnet = True
     cfg.trading_min_confidence = "high"
     cfg.trading_block_on_context_reject = True
-    allowed, reason = should_execute_trade(_signal(), _context("reject"), cfg)
+    allowed, reason = should_execute_trade(_signal(), _context("reject"), cfg, _execution())
     assert allowed is False
     assert reason == "context_reject"
 
@@ -89,7 +103,7 @@ def test_gate_blocks_low_rr() -> None:
     cfg.trading_min_confidence = "high"
     cfg.trading_block_on_context_reject = True
     allowed, reason = should_execute_trade(
-        _signal(entry="100", stop="95", target="105"), _context(), cfg
+        _signal(entry="100", stop="95", target="105"), _context(), cfg, _execution()
     )
     assert allowed is False
     assert reason.startswith("rr_below_minimum")
@@ -102,6 +116,6 @@ def test_gate_allows_valid_setup() -> None:
     cfg.binance_use_testnet = True
     cfg.trading_min_confidence = "high"
     cfg.trading_block_on_context_reject = True
-    allowed, reason = should_execute_trade(_signal(), _context("confirm"), cfg)
+    allowed, reason = should_execute_trade(_signal(), _context("confirm"), cfg, _execution())
     assert allowed is True
     assert reason == "ok"

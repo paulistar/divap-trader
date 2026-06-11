@@ -1,0 +1,18 @@
+id: agressivo
+name: Agressivo
+tagline: Mais exposição
+description: Aceita confiança média em contexto favorável — mais trades, mais risco.
+execution:
+  min_confidence: medium
+  block_on_reject: true
+  min_risk_reward: "1.8"
+  max_open_trades: 6
+  allowed_timeframes: ["1h", "4h"]
+  allocation_multiplier: "1.25"
+advisor:
+  ideal_fear_greed_min: 25
+  ideal_fear_greed_max: 90
+  preferred_verdicts: ["confirm", "caution"]
+  min_avg_score: 30
+  volatility: high
+  needs_momentum: false

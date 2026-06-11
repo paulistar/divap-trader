@@ -1,0 +1,18 @@
+id: caixa_rapido
+name: Caixa rápido
+tagline: Giro curto
+description: Timeframes menores, alvos curtos — exige volatilidade e momentum.
+execution:
+  min_confidence: high
+  block_on_reject: true
+  min_risk_reward: "1.5"
+  max_open_trades: 3
+  allowed_timeframes: ["15m", "1h"]
+  allocation_multiplier: "0.75"
+advisor:
+  ideal_fear_greed_min: 40
+  ideal_fear_greed_max: 85
+  preferred_verdicts: ["confirm", "caution"]
+  min_avg_score: 40
+  volatility: high
+  needs_momentum: true

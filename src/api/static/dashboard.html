@@ -46,6 +46,33 @@
     </div>
 
     <section>
+      <h2>Perfis — panorama do momento</h2>
+      <p class="subtitle section-hint">Todos os perfis avaliados com os dados atuais. Só o perfil ativo executa trades.</p>
+      <div class="profiles-grid" id="profiles-grid"></div>
+    </section>
+
+    <section>
+      <h2>Gestão da banca</h2>
+      <div class="bankroll-panel card" id="bankroll-panel">
+        <div class="bankroll-form">
+          <label>Perfil ativo (execução)
+            <select id="active-profile-select">
+              <option value="divap">DIVAP</option>
+              <option value="conservador">Conservador</option>
+              <option value="caixa_rapido">Caixa rápido</option>
+              <option value="agressivo">Agressivo</option>
+            </select>
+          </label>
+          <label>Meta mensal (USDT)
+            <input type="number" id="monthly-target-input" min="0" step="10" placeholder="Ex: 500" />
+          </label>
+          <button type="button" class="secondary" id="save-bankroll-btn">Salvar</button>
+        </div>
+        <div id="bankroll-summary"></div>
+      </div>
+    </section>
+
+    <section>
       <h2>Mercado agora</h2>
       <div class="grid grid-market" id="market-grid"></div>
     </section>

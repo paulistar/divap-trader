@@ -93,6 +93,16 @@ SCHEMA_STATEMENTS: list[str] = [
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS fear_greed INTEGER",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS htf_1d TEXT",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS htf_1w TEXT",
+    """
+    CREATE TABLE IF NOT EXISTS bankroll_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        active_profile_id TEXT NOT NULL DEFAULT 'divap',
+        monthly_target_usdt NUMERIC(20, 2),
+        goal_reached_at TIMESTAMPTZ,
+        period_month TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM'),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+    """,
 ]
 
 

@@ -79,7 +79,87 @@ section h2 {
   color: var(--text-muted);
   font-weight: 500;
 }
-.section-open h2 { color: var(--accent); }
+.section-hint { margin: -0.35rem 0 0.75rem; font-size: 0.8rem; }
+.profiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.profile-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+}
+.profile-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(59,130,246,0.25);
+}
+.profile-card .profile-name { font-weight: 600; font-size: 0.95rem; }
+.profile-card .profile-tagline { color: var(--text-muted); font-size: 0.75rem; margin-bottom: 0.5rem; }
+.profile-card .fit-score { font-size: 1.25rem; font-weight: 700; margin: 0.35rem 0; }
+.profile-card .fit-otimo { color: var(--success); }
+.profile-card .fit-bom { color: #86efac; }
+.profile-card .fit-neutro { color: var(--warning); }
+.profile-card .fit-ruim { color: var(--error); }
+.profile-card .profile-headline { font-size: 0.82rem; margin-bottom: 0.35rem; }
+.profile-card .profile-detail { font-size: 0.75rem; color: var(--text-muted); line-height: 1.45; }
+.profile-card .active-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(59,130,246,0.15);
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+.bankroll-panel { padding: 1rem; margin-bottom: 1.25rem; }
+.bankroll-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+.bankroll-form label { font-size: 0.75rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.25rem; }
+.bankroll-form input[type="number"] {
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  min-width: 120px;
+}
+.progress-bar {
+  height: 8px;
+  background: var(--bg-muted);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+.progress-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  border-radius: 999px;
+}
+.bankroll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+.bankroll-stat .value { font-size: 1.15rem; font-weight: 600; }
+.bankroll-stat .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; }
+.protected-banner {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(245,158,11,0.12);
+  border: 1px solid var(--warning);
+  color: #fcd34d;
+  font-size: 0.82rem;
+}
 .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
 table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 th, td { padding: 0.55rem 0.65rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }

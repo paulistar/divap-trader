@@ -2,7 +2,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse
+from decimal import Decimal
+
 from pydantic import BaseModel, Field
+
+from src.bankroll.service import build_bankroll_payload, build_profiles_payload
 
 from src.alerts.scheduler import run_divap_scan
 from src.api.dashboard_auth import (
@@ -35,6 +39,11 @@ _DASHBOARD_HTML = _STATIC_DIR / "dashboard.html"
 
 class DashboardAuthBody(BaseModel):
     secret: str = Field(min_length=1, description="API_KEY ou DASHBOARD_TOKEN")
+
+
+class BankrollUpdateBody(BaseModel):
+    active_profile_id: str | None = Field(default=None, pattern=r"^[a-z_]+$")
+    monthly_target_usdt: Decimal | None = Field(default=None, ge=0)
 
 
 async def require_dashboard_session(request: Request) -> None:
@@ -171,6 +180,44 @@ async def dashboard_balance(
     _: None = Depends(require_dashboard_session),
 ) -> ApiResponse[dict | None]:
     return ApiResponse(success=True, data=fetch_testnet_balance())
+
+
+@router.get("/dashboard/strategy", include_in_schema=False)
+async def dashboard_strategy(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    return ApiResponse(
+        success=True,
+        data={
+            "profiles": build_profiles_payload(),
+            "bankroll": build_bankroll_payload(),
+        },
+    )
+
+
+@router.post("/dashboard/bankroll", include_in_schema=False)
+async def dashboard_bankroll_update(
+    body: BankrollUpdateBody,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    from src.data.repositories.bankroll_repo import BankrollRepository
+    from src.profiles.loader import load_profile
+
+    if body.active_profile_id and load_profile(body.active_profile_id) is None:
+        raise HTTPException(status_code=400, detail="Perfil inválido")
+
+    repo = BankrollRepository()
+    repo.update_settings(
+        active_profile_id=body.active_profile_id,
+        monthly_target_usdt=body.monthly_target_usdt,
+    )
+    return ApiResponse(
+        success=True,
+        data={
+            "profiles": build_profiles_payload(),
+            "bankroll": build_bankroll_payload(),
+        },
+    )
 
 
 @router.get("/dashboard/alerts/{alert_id}", include_in_schema=False)

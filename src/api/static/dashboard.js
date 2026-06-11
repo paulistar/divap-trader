@@ -206,6 +206,88 @@ function renderBadges(health, stats) {
   `;
 }
 
+async function fetchStrategy() {
+  const res = await fetch("/dashboard/strategy", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return null;
+  return body.data || null;
+}
+
+async function saveBankroll(activeProfileId, monthlyTarget) {
+  const payload = {};
+  if (activeProfileId) payload.active_profile_id = activeProfileId;
+  if (monthlyTarget !== null && monthlyTarget !== "") payload.monthly_target_usdt = Number(monthlyTarget);
+  const res = await fetch("/dashboard/bankroll", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || "Falha ao salvar banca");
+  return body.data;
+}
+
+function profileFitClass(status) {
+  return `fit-${status || "neutro"}`;
+}
+
+function renderProfiles(data) {
+  const profiles = data?.profiles || [];
+  const grid = document.getElementById("profiles-grid");
+  if (!profiles.length) {
+    grid.innerHTML = '<div class="empty">Carregando perfis…</div>';
+    return;
+  }
+  grid.innerHTML = profiles.map((p) => `
+    <div class="profile-card ${p.is_active ? "active" : ""}">
+      ${p.is_active ? '<span class="active-pill">Ativo na execução</span>' : ""}
+      <div class="profile-name">${p.name}</div>
+      <div class="profile-tagline">${p.tagline || ""}</div>
+      <div class="fit-score ${profileFitClass(p.status)}">${p.fit_score}%</div>
+      <div class="profile-headline">${p.headline || ""}</div>
+      <div class="profile-detail">${p.detail || ""}</div>
+    </div>
+  `).join("");
+}
+
+function renderBankroll(bankroll, profilesPayload) {
+  const b = bankroll || {};
+  const select = document.getElementById("active-profile-select");
+  const targetInput = document.getElementById("monthly-target-input");
+  if (select && b.active_profile_id) select.value = b.active_profile_id;
+  if (targetInput && b.monthly_target_usdt != null) targetInput.value = b.monthly_target_usdt;
+
+  const progress = b.progress_pct != null ? Math.min(100, Number(b.progress_pct)) : 0;
+  const summary = document.getElementById("bankroll-summary");
+  summary.innerHTML = `
+    <div class="bankroll-grid">
+      <div class="bankroll-stat"><div class="label">PnL mês</div><div class="value">${fmtNum(b.monthly_pnl_usdt)} USDT</div></div>
+      <div class="bankroll-stat"><div class="label">Meta mensal</div><div class="value">${b.monthly_target_usdt ? fmtNum(b.monthly_target_usdt) + " USDT" : "—"}</div></div>
+      <div class="bankroll-stat"><div class="label">PnL semana</div><div class="value">${fmtNum(b.weekly_pnl_usdt)} USDT</div></div>
+      <div class="bankroll-stat"><div class="label">Meta semanal*</div><div class="value">${b.weekly_target_usdt ? fmtNum(b.weekly_target_usdt) : "—"} USDT</div></div>
+      <div class="bankroll-stat"><div class="label">Falta p/ meta (sem.)</div><div class="value">${b.weekly_needed_usdt ? fmtNum(b.weekly_needed_usdt) : "—"} USDT</div></div>
+      <div class="bankroll-stat"><div class="label">Banca demo</div><div class="value">${b.balance_usdt ? fmtNum(b.balance_usdt) : "—"} USDT</div></div>
+    </div>
+    ${b.monthly_target_usdt ? `<div class="progress-bar"><span style="width:${progress}%"></span></div><div class="subtitle">${progress}% da meta mensal</div>` : ""}
+    ${b.protected_mode ? '<div class="protected-banner">Meta mensal atingida — modo protegido: só entradas DIVAP alta confiança + contexto confirm.</div>' : ""}
+    <p class="subtitle" style="margin-top:0.5rem;">* Meta semanal = divisão proporcional da meta mensual pelas semanas do mês.</p>
+  `;
+
+  if (profilesPayload?.profiles) renderProfiles(profilesPayload);
+}
+
+async function loadStrategyExtras() {
+  try {
+    const data = await fetchStrategy();
+    if (!data) return;
+    renderBankroll(data.bankroll, data.profiles);
+  } catch (_) {
+    document.getElementById("profiles-grid").innerHTML =
+      '<div class="empty">Não foi possível carregar perfis agora.</div>';
+  }
+}
+
 function renderMarketPlaceholder() {
   document.getElementById("market-grid").innerHTML = `
     <div class="card"><div class="card-label">Fear & Greed</div><div class="card-value">…</div></div>
@@ -511,6 +593,7 @@ async function loadDashboard() {
     renderAlerts(d.alerts);
     renderPnlChart(d.pnl_series);
     loadSlowExtras(d.stats);
+    loadStrategyExtras();
     document.getElementById("footer-updated").textContent =
       "Atualizado: " + new Date().toLocaleString("pt-BR");
     document.getElementById("refresh-label").textContent = "Próximo refresh em 30s";
@@ -566,6 +649,18 @@ document.getElementById("filter-symbol")?.addEventListener("change", loadDashboa
 document.getElementById("filter-tf")?.addEventListener("change", loadDashboard);
 document.getElementById("filter-conf")?.addEventListener("change", loadDashboard);
 document.getElementById("filter-24h")?.addEventListener("change", loadDashboard);
+document.getElementById("save-bankroll-btn")?.addEventListener("click", async () => {
+  try {
+    const data = await saveBankroll(
+      document.getElementById("active-profile-select")?.value,
+      document.getElementById("monthly-target-input")?.value,
+    );
+    renderBankroll(data.bankroll, data.profiles);
+    showSuccess("Gestão da banca atualizada");
+  } catch (err) {
+    showError(err.message || "Falha ao salvar");
+  }
+});
 
 bindTableClicks();
 registerPwa();

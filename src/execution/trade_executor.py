@@ -9,6 +9,7 @@ from src.core.exceptions import ExchangeError
 from src.data.repositories.trade_repo import TradeRepository
 from src.detection.divap_scanner import DIVAPSignal
 from src.execution.binance_broker import BinanceBroker
+from src.bankroll.service import get_active_execution_profile
 from src.execution.gate import should_execute_trade
 from src.execution.risk_manager import (
     MIN_ORDER_USDT,
@@ -46,7 +47,14 @@ class TradeExecutor:
         alert_id: int,
         market_context: MarketContext | None,
     ) -> TradeExecutionResult:
-        allowed, reason = should_execute_trade(signal, market_context, settings)
+        _, execution, meta = get_active_execution_profile()
+        allowed, reason = should_execute_trade(
+            signal,
+            market_context,
+            settings,
+            execution,
+            goal_protected=meta.get("protected_mode", False),
+        )
         if not allowed:
             logger.info(
                 "Trade skipped %s %s: %s", signal.symbol, signal.timeframe, reason
@@ -59,7 +67,7 @@ class TradeExecutor:
                 direction=signal.direction,
             )
 
-        if self._repo.count_open_trades() >= settings.trading_max_open_trades:
+        if self._repo.count_open_trades() >= execution.max_open_trades:
             return TradeExecutionResult(
                 trade_id=None,
                 executed=False,
@@ -128,8 +136,10 @@ class TradeExecutor:
             )
 
     def _resolve_quote_amount(self, signal: DIVAPSignal) -> Decimal:
+        _, execution, _ = get_active_execution_profile()
         usdt = self._broker.get_usdt_balance()
         quote = calculate_quote_amount(usdt, signal.timeframe, signal.confidence)
+        quote = (quote * execution.allocation_multiplier).quantize(Decimal("0.01"))
         min_notional = max(self._broker.min_notional(signal.symbol), MIN_ORDER_USDT)
         return max(quote, min_notional) if quote > 0 else Decimal(0)
 
@@ -152,7 +162,7 @@ class TradeExecutor:
         take_profit: Decimal,
     ) -> TradeExecutionResult:
         usdt = self._broker.get_usdt_balance()
-        quote = calculate_quote_amount(usdt, signal.timeframe, signal.confidence)
+        quote = self._resolve_quote_amount(signal)
         min_notional = max(self._broker.min_notional(signal.symbol), MIN_ORDER_USDT)
 
         if quote < min_notional:
@@ -227,8 +237,7 @@ class TradeExecutor:
         market_context: MarketContext | None,
         take_profit: Decimal,
     ) -> TradeExecutionResult:
-        usdt = self._broker.get_usdt_balance()
-        quote_equiv = calculate_quote_amount(usdt, signal.timeframe, signal.confidence)
+        quote_equiv = self._resolve_quote_amount(signal)
         quantity = base_quantity_from_quote(quote_equiv, signal.entry_price)
         base_balance = self._broker.get_base_balance(signal.symbol)
         quantity = min(quantity, base_balance)
