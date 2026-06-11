@@ -1,4 +1,4 @@
-const CACHE = "divap-dashboard-v3";
+const CACHE = "divap-dashboard-v4";
 const SHELL = ["/dashboard/static/icon.svg"];
 
 const NETWORK_ONLY_PREFIXES = [
@@ -12,7 +12,7 @@ const NETWORK_ONLY_PREFIXES = [
   "/dashboard/scan",
   "/dashboard/auth",
   "/dashboard/bankroll",
-  "/dashboard/push",
+  "/dashboard/push/status",
   "/dashboard/strategy/insights",
 ];
 

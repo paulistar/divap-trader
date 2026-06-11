@@ -27,6 +27,47 @@ def store_subscription(subscription: dict) -> None:
     save_subscription(endpoint, subscription)
 
 
+def notify_subscription_test(subscription: dict) -> bool:
+    """Send a welcome test push to a single subscription. Returns True if sent."""
+    if not vapid_configured():
+        return False
+
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:
+        logger.warning("pywebpush not installed — push disabled")
+        return False
+
+    endpoint = subscription.get("endpoint", "")
+    if not endpoint:
+        return False
+
+    payload = json.dumps(
+        {
+            "title": "DIVAP — push ativado",
+            "body": "Se você viu isto, alertas de alta confiança chegam mesmo com o app fechado.",
+            "url": "/dashboard",
+            "alert_id": 0,
+        }
+    )
+    try:
+        webpush(
+            subscription_info=subscription,
+            data=payload,
+            vapid_private_key=settings.vapid_private_key,
+            vapid_claims={"sub": settings.vapid_claims_sub},
+        )
+        return True
+    except WebPushException as exc:
+        status = getattr(exc.response, "status_code", None) if exc.response else None
+        if status in (404, 410):
+            remove_subscription(endpoint)
+        logger.warning("Welcome push failed %s: %s", endpoint[:48], exc)
+    except Exception as exc:
+        logger.warning("Welcome push error: %s", exc)
+    return False
+
+
 def delete_subscription(endpoint: str) -> None:
     if endpoint:
         remove_subscription(endpoint)

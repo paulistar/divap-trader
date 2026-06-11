@@ -8,10 +8,13 @@ from pydantic import BaseModel, Field
 
 from src.api.push_service import (
     delete_subscription,
+    notify_subscription_test,
     notify_test_push,
     store_subscription,
+    vapid_configured,
     vapid_public_key,
 )
+from src.api.push_subscriptions import list_subscriptions
 
 from src.bankroll.service import (
     build_bankroll_payload,
@@ -205,13 +208,31 @@ async def dashboard_push_vapid_key(
     return ApiResponse(success=True, data={"public_key": key, "configured": key is not None})
 
 
+@router.get("/dashboard/push/status", include_in_schema=False)
+async def dashboard_push_status(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    subs = list_subscriptions()
+    return ApiResponse(
+        success=True,
+        data={
+            "configured": vapid_configured(),
+            "subscriptions": len(subs),
+        },
+    )
+
+
 @router.post("/dashboard/push/subscribe", include_in_schema=False)
 async def dashboard_push_subscribe(
     body: PushSubscribeBody,
     _: None = Depends(require_dashboard_session),
 ) -> ApiResponse[dict]:
     store_subscription(body.subscription)
-    return ApiResponse(success=True, data={"subscribed": True})
+    test_sent = notify_subscription_test(body.subscription)
+    return ApiResponse(
+        success=True,
+        data={"subscribed": True, "test_sent": test_sent},
+    )
 
 
 @router.post("/dashboard/push/unsubscribe", include_in_schema=False)

@@ -277,43 +277,105 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
 }
 
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isInstalledPwa() {
+  return window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function setPushBtnActive(active) {
+  const btn = document.getElementById("push-btn");
+  if (!btn) return;
+  btn.classList.toggle("active", active);
+  if (active) localStorage.setItem("divap-notify-enabled", "1");
+  else localStorage.removeItem("divap-notify-enabled");
+}
+
+async function syncPushButtonState() {
+  try {
+    const res = await fetch("/dashboard/push/status", { credentials: "same-origin" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    setPushBtnActive((body.data?.subscriptions || 0) > 0);
+  } catch (_) { /* ignore */ }
+}
+
 async function subscribePush() {
+  const btn = document.getElementById("push-btn");
+  if (btn?.disabled) return;
+
   if (!("serviceWorker" in navigator)) {
-    showError("Push não suportado neste navegador");
+    showError("Push não suportado neste navegador.");
     return;
   }
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") {
-    showError("Permissão de notificação negada");
+  if (isIosDevice() && !isInstalledPwa()) {
+    showError(
+      "No iPhone: adicione à Tela de Início (Safari → Compartilhar → Adicionar à Tela de Início), "
+      + "abra o ícone DIVAP e toque em Push de novo."
+    );
     return;
   }
-  const reg = await navigator.serviceWorker.ready;
-  const vapidRes = await fetch("/dashboard/push/vapid-key", { credentials: "same-origin" });
-  const vapidBody = await vapidRes.json().catch(() => ({}));
-  const publicKey = vapidBody.data?.public_key;
-  if (publicKey && "PushManager" in window) {
-    try {
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
-      await fetch("/dashboard/push/subscribe", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: sub.toJSON() }),
-      });
-      localStorage.setItem("divap-notify-enabled", "1");
-      document.getElementById("push-btn")?.classList.add("active");
-      showSuccess("Push ativado — alertas de alta confiança no celular");
+  if (!("PushManager" in window)) {
+    showError("Push remoto indisponível neste navegador. Use Chrome/Android ou instale o PWA no iPhone.");
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  hideError();
+
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") {
+      showError("Permissão negada. Ative notificações nas configurações do navegador.");
       return;
-    } catch (err) {
-      showError("Falha no push remoto: " + (err.message || "erro"));
     }
+
+    const reg = await navigator.serviceWorker.ready;
+    const vapidRes = await fetch("/dashboard/push/vapid-key", { credentials: "same-origin" });
+    const vapidBody = await vapidRes.json().catch(() => ({}));
+    if (!vapidRes.ok) {
+      showError(vapidBody.detail || "Sessão expirada — faça login e tente de novo.");
+      return;
+    }
+    const publicKey = vapidBody.data?.public_key;
+    if (!publicKey || !vapidBody.data?.configured) {
+      showError("Push não configurado no servidor (VAPID).");
+      return;
+    }
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+
+    const saveRes = await fetch("/dashboard/push/subscribe", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub.toJSON() }),
+    });
+    const saveBody = await saveRes.json().catch(() => ({}));
+    if (!saveRes.ok) {
+      showError(saveBody.detail || "Falha ao registrar push no servidor.");
+      return;
+    }
+
+    setPushBtnActive(true);
+    if (saveBody.data?.test_sent) {
+      showSuccess("Push ativado — verifique a notificação de teste no celular.");
+    } else {
+      showSuccess("Push registrado, mas o teste não chegou. Verifique permissões e tente de novo.");
+    }
+  } catch (err) {
+    showError("Falha no push: " + (err.message || "erro desconhecido"));
+    setPushBtnActive(false);
+  } finally {
+    if (btn) btn.disabled = false;
   }
-  localStorage.setItem("divap-notify-enabled", "1");
-  document.getElementById("push-btn")?.classList.add("active");
-  showSuccess("Notificações locais ativadas (com app aberto). Configure VAPID para push em background.");
 }
 
 function renderBadges(health, stats, scan, bankroll) {
@@ -933,6 +995,7 @@ function showApp() {
   loginView.classList.add("hidden");
   appView.classList.remove("hidden");
   loadDashboard();
+  syncPushButtonState();
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(loadDashboard, REFRESH_MS);
 }
@@ -945,7 +1008,7 @@ function showLogin() {
 
 function registerPwa() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/dashboard/static/sw.js?v=3", { scope: "/dashboard/" })
+  navigator.serviceWorker.register("/dashboard/static/sw.js?v=4", { scope: "/dashboard/" })
     .then((reg) => {
       reg.addEventListener("updatefound", () => {
         const worker = reg.installing;
@@ -1013,7 +1076,7 @@ document.getElementById("verdict-chips")?.addEventListener("click", (e) => {
 });
 
 if (localStorage.getItem("divap-notify-enabled") === "1") {
-  document.getElementById("push-btn")?.classList.add("active");
+  setPushBtnActive(true);
 }
 document.getElementById("save-bankroll-btn")?.addEventListener("click", async () => {
   try {
