@@ -9,37 +9,6 @@ from src.data.repositories.bankroll_repo import BankrollRepository
 from src.execution.binance_broker import BinanceBroker
 from src.core.exceptions import ExchangeError
 from src.profiles.advisor import assess_all_profiles
-from src.profiles.loader import load_profile, protected_execution_profile
-from src.profiles.models import ProfileExecution, TradingProfile
-
-
-def get_active_execution_profile() -> tuple[TradingProfile | None, ProfileExecution, dict]:
-    repo = BankrollRepository()
-    settings = repo.get_settings()
-    profile = load_profile(settings.active_profile_id) or load_profile("divap")
-    meta = {
-        "active_profile_id": settings.active_profile_id,
-        "goal_reached": settings.goal_reached_at is not None,
-        "goal_reached_at": settings.goal_reached_at.isoformat() if settings.goal_reached_at else None,
-    }
-    if settings.goal_reached_at is not None:
-        if profile is None:
-            execution = protected_execution_profile()
-            return None, execution, meta
-        protected = ProfileExecution(
-            min_confidence="high",
-            block_on_reject=True,
-            min_risk_reward=profile.execution.min_risk_reward,
-            max_open_trades=1,
-            allowed_timeframes=profile.execution.allowed_timeframes,
-            allocation_multiplier=Decimal("0.35"),
-        )
-        meta["protected_mode"] = True
-        return profile, protected, meta
-    if profile is None:
-        execution = protected_execution_profile()
-        return None, execution, meta
-    return profile, profile.execution, meta
 
 
 def _weeks_in_current_month() -> int:
@@ -98,14 +67,72 @@ def build_bankroll_payload() -> dict:
     }
 
 
+def build_profile_performance() -> list[dict]:
+    from src.profiles.loader import load_all_profiles
+    from src.data.repositories.trade_repo import TradeRepository
+
+    stats_rows = TradeRepository().profile_stats()
+    stats_map = {row["profile_id"]: row for row in stats_rows}
+    performance: list[dict] = []
+
+    for profile in load_all_profiles():
+        row = stats_map.get(profile.id, {})
+        closed = int(row.get("closed_count") or 0)
+        wins = int(row.get("wins") or 0)
+        win_rate = round((wins / closed) * 100, 1) if closed else 0.0
+        performance.append(
+            {
+                "profile_id": profile.id,
+                "name": profile.name,
+                "closed_count": closed,
+                "open_count": int(row.get("open_count") or 0),
+                "wins": wins,
+                "losses": int(row.get("losses") or 0),
+                "win_rate_pct": str(win_rate),
+                "total_pnl_usdt": str(Decimal(str(row.get("total_pnl_usdt") or 0)).quantize(Decimal("0.01"))),
+                "month_pnl_usdt": str(Decimal(str(row.get("month_pnl_usdt") or 0)).quantize(Decimal("0.01"))),
+                "week_pnl_usdt": str(Decimal(str(row.get("week_pnl_usdt") or 0)).quantize(Decimal("0.01"))),
+            }
+        )
+    return performance
+
+
+def build_profile_history(limit_per_profile: int = 5) -> dict[str, list[dict]]:
+    from src.profiles.loader import load_all_profiles
+    from src.data.repositories.trade_repo import TradeRepository
+
+    repo = TradeRepository()
+    history: dict[str, list[dict]] = {}
+    for profile in load_all_profiles():
+        rows = repo.recent_trades_for_profile(profile.id, limit_per_profile)
+        history[profile.id] = [
+            {
+                "id": row["id"],
+                "symbol": row["symbol"],
+                "timeframe": row["timeframe"],
+                "direction": row["direction"],
+                "status": row["status"],
+                "pnl_usdt": str(row["pnl_usdt"]) if row["pnl_usdt"] is not None else None,
+                "goal_protected": bool(row.get("goal_protected", False)),
+                "opened_at": row["opened_at"].isoformat() if row.get("opened_at") else None,
+                "closed_at": row["closed_at"].isoformat() if row.get("closed_at") else None,
+            }
+            for row in rows
+        ]
+    return history
+
+
 def build_profiles_payload() -> dict:
     repo = BankrollRepository()
     settings = repo.get_settings()
     market = build_market_overview()
     snapshots = assess_all_profiles(market, settings.active_profile_id)
+    performance = {p["profile_id"]: p for p in build_profile_performance()}
     return {
         "active_profile_id": settings.active_profile_id,
         "goal_reached": settings.goal_reached_at is not None,
+        "performance": list(performance.values()),
+        "history": build_profile_history(),
         "profiles": [
             {
                 "id": snap.profile.id,
@@ -117,6 +144,7 @@ def build_profiles_payload() -> dict:
                 "status": snap.assessment.status,
                 "headline": snap.assessment.headline,
                 "detail": snap.assessment.detail,
+                "performance": performance.get(snap.profile.id),
             }
             for snap in snapshots
         ],

@@ -9,7 +9,7 @@ from src.core.exceptions import ExchangeError
 from src.data.repositories.trade_repo import TradeRepository
 from src.detection.divap_scanner import DIVAPSignal
 from src.execution.binance_broker import BinanceBroker
-from src.bankroll.service import get_active_execution_profile
+from src.bankroll.execution_context import get_active_execution_profile, get_execution_context
 from src.execution.gate import should_execute_trade
 from src.execution.risk_manager import (
     MIN_ORDER_USDT,
@@ -48,6 +48,7 @@ class TradeExecutor:
         market_context: MarketContext | None,
     ) -> TradeExecutionResult:
         _, execution, meta = get_active_execution_profile()
+        profile_id, goal_protected = get_execution_context()
         allowed, reason = should_execute_trade(
             signal,
             market_context,
@@ -110,8 +111,9 @@ class TradeExecutor:
                 tp_order_id=None,
                 trading_mode=settings.trading_mode,
                 opened_at=datetime.now(UTC),
+                profile_id=profile_id,
+                goal_protected=goal_protected,
             )
-            logger.info("Dry-run trade #%s simulated for %s", trade_id, signal.symbol)
             return TradeExecutionResult(
                 trade_id=trade_id,
                 executed=True,
@@ -124,7 +126,9 @@ class TradeExecutor:
             )
 
         try:
-            return self._execute_live(signal, alert_id, market_context, take_profit)
+            return self._execute_live(
+                signal, alert_id, market_context, take_profit, profile_id, goal_protected
+            )
         except ExchangeError as exc:
             logger.error("Trade execution failed %s: %s", signal.symbol, exc)
             return TradeExecutionResult(
@@ -149,10 +153,16 @@ class TradeExecutor:
         alert_id: int,
         market_context: MarketContext | None,
         take_profit: Decimal,
+        profile_id: str,
+        goal_protected: bool,
     ) -> TradeExecutionResult:
         if signal.direction == "buy":
-            return self._execute_buy(signal, alert_id, market_context, take_profit)
-        return self._execute_sell(signal, alert_id, market_context, take_profit)
+            return self._execute_buy(
+                signal, alert_id, market_context, take_profit, profile_id, goal_protected
+            )
+        return self._execute_sell(
+            signal, alert_id, market_context, take_profit, profile_id, goal_protected
+        )
 
     def _execute_buy(
         self,
@@ -160,6 +170,8 @@ class TradeExecutor:
         alert_id: int,
         market_context: MarketContext | None,
         take_profit: Decimal,
+        profile_id: str,
+        goal_protected: bool,
     ) -> TradeExecutionResult:
         usdt = self._broker.get_usdt_balance()
         quote = self._resolve_quote_amount(signal)
@@ -216,6 +228,8 @@ class TradeExecutor:
             tp_order_id=str(tp_order["id"]) if tp_order else None,
             trading_mode=settings.trading_mode,
             opened_at=datetime.now(UTC),
+            profile_id=profile_id,
+            goal_protected=goal_protected,
         )
 
         logger.info("Trade #%s opened BUY %s qty=%s", trade_id, signal.symbol, quantity)
@@ -236,6 +250,8 @@ class TradeExecutor:
         alert_id: int,
         market_context: MarketContext | None,
         take_profit: Decimal,
+        profile_id: str,
+        goal_protected: bool,
     ) -> TradeExecutionResult:
         quote_equiv = self._resolve_quote_amount(signal)
         quantity = base_quantity_from_quote(quote_equiv, signal.entry_price)
@@ -284,6 +300,8 @@ class TradeExecutor:
             tp_order_id=None,
             trading_mode=settings.trading_mode,
             opened_at=datetime.now(UTC),
+            profile_id=profile_id,
+            goal_protected=goal_protected,
         )
 
         logger.info("Trade #%s opened SELL %s qty=%s", trade_id, signal.symbol, filled_qty)

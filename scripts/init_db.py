@@ -93,6 +93,9 @@ SCHEMA_STATEMENTS: list[str] = [
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS fear_greed INTEGER",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS htf_1d TEXT",
     "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS htf_1w TEXT",
+    "ALTER TABLE trades ADD COLUMN IF NOT EXISTS profile_id TEXT DEFAULT 'divap'",
+    "ALTER TABLE trades ADD COLUMN IF NOT EXISTS goal_protected BOOLEAN NOT NULL DEFAULT FALSE",
+    "CREATE INDEX IF NOT EXISTS idx_trades_profile_id ON trades (profile_id, closed_at DESC)",
     """
     CREATE TABLE IF NOT EXISTS bankroll_settings (
         id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),

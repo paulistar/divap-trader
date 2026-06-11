@@ -232,6 +232,16 @@ function profileFitClass(status) {
   return `fit-${status || "neutro"}`;
 }
 
+function profileLabel(id) {
+  const map = {
+    divap: "DIVAP",
+    conservador: "Conservador",
+    caixa_rapido: "Caixa rápido",
+    agressivo: "Agressivo",
+  };
+  return map[id] || id || "—";
+}
+
 function renderProfiles(data) {
   const profiles = data?.profiles || [];
   const grid = document.getElementById("profiles-grid");
@@ -239,7 +249,16 @@ function renderProfiles(data) {
     grid.innerHTML = '<div class="empty">Carregando perfis…</div>';
     return;
   }
-  grid.innerHTML = profiles.map((p) => `
+  grid.innerHTML = profiles.map((p) => {
+    const perf = p.performance;
+    const perfHtml = perf ? `
+      <div class="profile-stats">
+        <div><span>PnL mês</span><strong>${fmtNum(perf.month_pnl_usdt)}</strong></div>
+        <div><span>Win rate</span><strong>${fmtNum(perf.win_rate_pct, 1)}%</strong></div>
+        <div><span>Fechados</span><strong>${perf.closed_count ?? 0}</strong></div>
+        <div><span>PnL total</span><strong>${fmtNum(perf.total_pnl_usdt)}</strong></div>
+      </div>` : "";
+    return `
     <div class="profile-card ${p.is_active ? "active" : ""}">
       ${p.is_active ? '<span class="active-pill">Ativo na execução</span>' : ""}
       <div class="profile-name">${p.name}</div>
@@ -247,8 +266,57 @@ function renderProfiles(data) {
       <div class="fit-score ${profileFitClass(p.status)}">${p.fit_score}%</div>
       <div class="profile-headline">${p.headline || ""}</div>
       <div class="profile-detail">${p.detail || ""}</div>
+      ${perfHtml}
+    </div>`;
+  }).join("");
+}
+
+function renderProfilePerformance(data) {
+  const perf = data?.performance || [];
+  const grid = document.getElementById("profile-performance-grid");
+  if (!grid) return;
+  if (!perf.length) {
+    grid.innerHTML = '<div class="empty">Sem trades executados por perfil ainda.</div>';
+    return;
+  }
+  grid.innerHTML = perf.map((p) => `
+    <div class="profile-card ${p.profile_id === data.active_profile_id ? "active" : ""}">
+      <div class="profile-name">${p.name}</div>
+      <div class="profile-stats">
+        <div><span>Semana</span><strong>${fmtNum(p.week_pnl_usdt)} USDT</strong></div>
+        <div><span>Mês</span><strong>${fmtNum(p.month_pnl_usdt)} USDT</strong></div>
+        <div><span>Total</span><strong>${fmtNum(p.total_pnl_usdt)} USDT</strong></div>
+        <div><span>Win rate</span><strong>${fmtNum(p.win_rate_pct, 1)}%</strong></div>
+      </div>
+      <div class="profile-detail">${p.closed_count ?? 0} fechados · ${p.open_count ?? 0} abertos</div>
     </div>
   `).join("");
+}
+
+function renderProfileHistory(data) {
+  const history = data?.history || {};
+  const profiles = data?.profiles || [];
+  const container = document.getElementById("profile-history-tabs");
+  if (!container) return;
+  const blocks = profiles.map((p) => {
+    const rows = history[p.id] || [];
+    if (!rows.length) {
+      return `<div class="profile-history-block"><h3>${p.name}</h3><div class="empty">Nenhum trade neste perfil</div></div>`;
+    }
+    const body = rows.map((t) => `
+      <tr>
+        <td>#${t.id}</td>
+        <td>${t.symbol}</td>
+        <td>${t.timeframe}</td>
+        <td>${statusLabel(t.status)}</td>
+        <td>${t.pnl_usdt != null ? fmtNum(t.pnl_usdt) : "—"}</td>
+        <td>${t.goal_protected ? "Protegido" : "—"}</td>
+      </tr>`).join("");
+    return `<div class="profile-history-block"><h3>${p.name}</h3>
+      <table><thead><tr><th>ID</th><th>Par</th><th>TF</th><th>Status</th><th>PnL</th><th>Modo</th></tr></thead><tbody>${body}</tbody></table>
+    </div>`;
+  }).join("");
+  container.innerHTML = blocks || '<div class="empty">Sem histórico por perfil.</div>';
 }
 
 function renderBankroll(bankroll, profilesPayload) {
@@ -275,6 +343,10 @@ function renderBankroll(bankroll, profilesPayload) {
   `;
 
   if (profilesPayload?.profiles) renderProfiles(profilesPayload);
+  if (profilesPayload) {
+    renderProfilePerformance(profilesPayload);
+    renderProfileHistory(profilesPayload);
+  }
 }
 
 async function loadStrategyExtras() {
@@ -363,6 +435,7 @@ function tradeRow(t, clickable = true) {
     <td>#${t.id}</td>
     <td>${t.symbol}</td>
     <td>${t.timeframe}</td>
+    <td>${profileLabel(t.profile_id)}</td>
     <td>${dirLabel(t.direction)}</td>
     <td>${statusLabel(t.status)}</td>
     <td>${fmtNum(t.entry_price)}</td>
@@ -388,7 +461,7 @@ function renderTrades(trades) {
   const rows = trades || [];
   const tbody = document.getElementById("trades-body");
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">Nenhum trade fechado ainda</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">Nenhum trade fechado ainda</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((t) => tradeRow(t)).join("");

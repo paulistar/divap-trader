@@ -13,12 +13,14 @@ INSERT INTO trades (
     alert_id, symbol, timeframe, direction, confidence, status,
     entry_price, stop_loss, take_profit, quantity, quote_amount,
     context_verdict, context_score, exchange_order_id,
-    stop_order_id, tp_order_id, trading_mode, opened_at
+    stop_order_id, tp_order_id, trading_mode, opened_at,
+    profile_id, goal_protected
 ) VALUES (
     %s, %s, %s, %s, %s, %s,
     %s, %s, %s, %s, %s,
     %s, %s, %s,
-    %s, %s, %s, %s
+    %s, %s, %s, %s,
+    %s, %s
 ) RETURNING id
 """
 
@@ -65,10 +67,43 @@ SELECT * FROM trades WHERE id = %s
 """
 
 PNL_HISTORY_SQL = """
-SELECT id, closed_at, pnl_usdt, pnl_pct
+SELECT id, closed_at, pnl_usdt, pnl_pct, profile_id
 FROM trades
 WHERE status = 'closed' AND closed_at IS NOT NULL
 ORDER BY closed_at ASC
+LIMIT %s
+"""
+
+PROFILE_STATS_SQL = """
+SELECT
+    COALESCE(profile_id, 'divap') AS profile_id,
+    COUNT(*) FILTER (WHERE status = 'closed') AS closed_count,
+    COUNT(*) FILTER (WHERE status = 'open') AS open_count,
+    COUNT(*) FILTER (WHERE status = 'closed' AND pnl_usdt > 0) AS wins,
+    COUNT(*) FILTER (WHERE status = 'closed' AND pnl_usdt <= 0) AS losses,
+    COALESCE(SUM(pnl_usdt) FILTER (WHERE status = 'closed'), 0) AS total_pnl_usdt,
+    COALESCE(SUM(pnl_usdt) FILTER (
+        WHERE status = 'closed'
+          AND closed_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+          AND closed_at < date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
+    ), 0) AS month_pnl_usdt,
+    COALESCE(SUM(pnl_usdt) FILTER (
+        WHERE status = 'closed'
+          AND closed_at >= date_trunc('week', NOW() AT TIME ZONE 'UTC')
+          AND closed_at < date_trunc('week', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 week'
+    ), 0) AS week_pnl_usdt
+FROM trades
+WHERE status != 'simulated'
+GROUP BY COALESCE(profile_id, 'divap')
+"""
+
+RECENT_BY_PROFILE_SQL = """
+SELECT id, symbol, timeframe, direction, status, pnl_usdt, profile_id,
+       goal_protected, opened_at, closed_at
+FROM trades
+WHERE status != 'simulated'
+  AND (%s IS NULL OR COALESCE(profile_id, 'divap') = %s)
+ORDER BY COALESCE(closed_at, opened_at, created_at) DESC
 LIMIT %s
 """
 
@@ -114,6 +149,8 @@ class TradeRecord:
     opened_at: datetime | None
     closed_at: datetime | None
     created_at: datetime
+    profile_id: str | None = None
+    goal_protected: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +209,8 @@ class TradeRepository:
         tp_order_id: str | None,
         trading_mode: str,
         opened_at: datetime,
+        profile_id: str = "divap",
+        goal_protected: bool = False,
     ) -> int:
         with self._connection() as conn:
             with conn.cursor() as cur:
@@ -196,6 +235,8 @@ class TradeRepository:
                         tp_order_id,
                         trading_mode,
                         opened_at,
+                        profile_id,
+                        goal_protected,
                     ),
                 )
                 return cur.fetchone()[0]
@@ -225,6 +266,20 @@ class TradeRepository:
                 cur.execute(SELECT_TRADES_SQL, (limit, offset))
                 rows = cur.fetchall()
         return [self._row_to_record(row) for row in rows]
+
+    def profile_stats(self) -> list[dict]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(PROFILE_STATS_SQL)
+                return list(cur.fetchall())
+
+    def recent_trades_for_profile(
+        self, profile_id: str | None = None, limit: int = 5
+    ) -> list[dict]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(RECENT_BY_PROFILE_SQL, (profile_id, profile_id, limit))
+                return list(cur.fetchall())
 
     def pnl_history(self, limit: int = 100) -> list[dict]:
         with self._connection() as conn:
@@ -312,6 +367,8 @@ class TradeRepository:
             tp_order_id=row["tp_order_id"],
             close_reason=row["close_reason"],
             trading_mode=row["trading_mode"],
+            profile_id=row.get("profile_id"),
+            goal_protected=bool(row.get("goal_protected", False)),
             opened_at=row["opened_at"],
             closed_at=row["closed_at"],
             created_at=row["created_at"],

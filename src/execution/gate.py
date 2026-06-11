@@ -28,7 +28,7 @@ def should_execute_trade(
 
     profile_exec = execution
     if profile_exec is None:
-        from src.bankroll.service import get_active_execution_profile
+        from src.bankroll.execution_context import get_active_execution_profile
 
         _, profile_exec, meta = get_active_execution_profile()
         goal_protected = meta.get("protected_mode", False)

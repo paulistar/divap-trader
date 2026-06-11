@@ -114,6 +114,25 @@ section h2 {
   color: var(--accent);
   margin-bottom: 0.35rem;
 }
+.profile-card .profile-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+}
+.profile-card .profile-stats span { color: var(--text-muted); display: block; }
+.profile-card .profile-stats strong { color: var(--text); font-size: 0.85rem; }
+.profile-history-tabs { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+.profile-history-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+.profile-history-block h3 { font-size: 0.85rem; margin-bottom: 0.5rem; }
+.profile-history-block table { font-size: 0.78rem; width: 100%; }
+.section-open h2 { color: var(--accent); }
 .bankroll-panel { padding: 1rem; margin-bottom: 1.25rem; }
 .bankroll-form {
   display: flex;
