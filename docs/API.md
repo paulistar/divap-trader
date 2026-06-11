@@ -25,7 +25,9 @@ Health check.
 
 ### `GET /dashboard`
 
-Painel web simples para acompanhar alertas, trades e métricas. Página pública; ao abrir, informe a `X-API-Key` (salva no navegador). Auto-refresh a cada 30s.
+Painel web simples para acompanhar alertas, trades e métricas. Página pública; login com **`DASHBOARD_TOKEN`** (recomendado) ou `API_KEY`. Sessão via cookie HttpOnly. Auto-refresh a cada 30s.
+
+No Easypanel: `DASHBOARD_TOKEN=seu-pin` em Environment.
 
 **Resposta:**
 ```json

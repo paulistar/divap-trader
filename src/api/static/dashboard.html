@@ -158,13 +158,13 @@
   <div id="login-view" class="wrap">
     <div class="login-panel">
       <h2>DIVAP Trader</h2>
-      <p>Informe a <strong>API_KEY</strong> do Easypanel (Environment → <code>API_KEY</code>).</p>
+      <p>Informe o <strong>DASHBOARD_TOKEN</strong> do Easypanel (senha curta só para este painel).</p>
       <form id="login-form">
         <div class="error-banner" id="login-error"></div>
-        <input type="password" id="api-key-input" placeholder="API_KEY ou token do painel" autocomplete="off" required />
+        <input type="password" id="api-key-input" placeholder="DASHBOARD_TOKEN" autocomplete="off" required />
         <button type="submit">Entrar no painel</button>
       </form>
-      <p style="margin-top:1rem;font-size:0.75rem;">Login seguro por cookie — a chave não fica salva no navegador.</p>
+      <p style="margin-top:1rem;font-size:0.75rem;">Configure em Easypanel → Environment → <code>DASHBOARD_TOKEN</code>. A API_KEY longa é para integrações (curl/scripts), não precisa usar aqui.</p>
     </div>
   </div>
 

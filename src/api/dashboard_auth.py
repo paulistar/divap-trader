@@ -47,11 +47,26 @@ def _safe_compare(left: str, right: str) -> bool:
     return compare_digest(left, right)
 
 
+def _normalize_secret(secret: str) -> str:
+    value = secret.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1].strip()
+    return value
+
+
 def validate_dashboard_secret(secret: str) -> bool:
     if settings.app_env == "development":
         return True
-    if _safe_compare(secret, settings.api_key):
+    normalized = _normalize_secret(secret)
+    if _safe_compare(normalized, settings.api_key.strip()):
         return True
-    if settings.dashboard_token and _safe_compare(secret, settings.dashboard_token):
+    token = settings.dashboard_token.strip() if settings.dashboard_token else ""
+    if token and _safe_compare(normalized, token):
         return True
     return False
+
+
+def dashboard_login_hint() -> str:
+    if settings.dashboard_token:
+        return "Use o DASHBOARD_TOKEN configurado no Easypanel."
+    return "Use a API_KEY do Easypanel (Environment → API_KEY)."

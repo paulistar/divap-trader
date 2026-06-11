@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from src.api.dashboard_auth import (
     create_session_token,
+    dashboard_login_hint,
     validate_dashboard_secret,
     verify_session_token,
 )
@@ -35,7 +36,16 @@ def test_validate_dashboard_secret() -> None:
         mock_settings.dashboard_token = "panel-pin"
         assert validate_dashboard_secret("correct-key") is True
         assert validate_dashboard_secret("panel-pin") is True
+        assert validate_dashboard_secret('"panel-pin"') is True
         assert validate_dashboard_secret("wrong") is False
+
+
+def test_dashboard_login_hint_prefers_token() -> None:
+    with patch("src.api.dashboard_auth.settings") as mock_settings:
+        mock_settings.dashboard_token = "pin"
+        assert "DASHBOARD_TOKEN" in dashboard_login_hint()
+        mock_settings.dashboard_token = ""
+        assert "API_KEY" in dashboard_login_hint()
 
 
 def test_dashboard_auth_endpoint() -> None:

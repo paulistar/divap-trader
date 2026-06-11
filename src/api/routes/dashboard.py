@@ -8,6 +8,7 @@ from src.api.dashboard_auth import (
     COOKIE_NAME,
     SESSION_MAX_AGE,
     create_session_token,
+    dashboard_login_hint,
     validate_dashboard_secret,
     verify_session_token,
 )
@@ -61,10 +62,10 @@ async def dashboard_page() -> HTMLResponse:
 
 @router.post("/dashboard/auth", include_in_schema=False)
 async def dashboard_auth(body: DashboardAuthBody, response: Response) -> ApiResponse[dict]:
-    if not validate_dashboard_secret(body.secret.strip()):
+    if not validate_dashboard_secret(body.secret):
         raise HTTPException(
             status_code=401,
-            detail="Chave inválida. Use a API_KEY do Easypanel (Environment → API_KEY).",
+            detail=f"Chave inválida. {dashboard_login_hint()}",
         )
 
     token = create_session_token()
