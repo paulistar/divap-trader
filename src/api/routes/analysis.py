@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 from src.alerts.scheduler import run_divap_scan
 from src.analysis.llm_analyzer import LLMAnalyzer
+from src.context.collector import collect_market_context
 from src.api.deps import verify_api_key
 from src.api.schemas import ApiResponse
 from src.core.exceptions import AnalysisError, ExchangeError
@@ -52,11 +53,14 @@ async def analyze_symbol(
             data={"signal": None, "message": "Nenhum setup DIVAP detectado"},
         )
 
+    market_context = collect_market_context(symbol, timeframe, signal.direction)
     result: dict = {"signal": _signal_to_dict(signal)}
+    if market_context:
+        result["market_context"] = market_context.to_dict()
 
     if with_llm:
         try:
-            analysis = LLMAnalyzer().analyze(signal)
+            analysis = LLMAnalyzer().analyze(signal, market_context)
             result["analysis"] = analysis
         except AnalysisError as exc:
             result["analysis_error"] = str(exc)

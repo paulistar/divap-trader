@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 from pathlib import Path
 
+from src.context.models import MarketContext
 from src.core.constants import BANK_ALLOCATION_PCT
 from src.detection.divap_scanner import DIVAPSignal
 
@@ -40,10 +41,18 @@ def signal_to_payload(signal: DIVAPSignal) -> dict:
     }
 
 
-def build_user_message(signal: DIVAPSignal) -> str:
-    payload = signal_to_payload(signal)
+def build_user_message(
+    signal: DIVAPSignal,
+    market_context: MarketContext | None = None,
+) -> str:
+    payload = {
+        "setup_divap": signal_to_payload(signal),
+        "market_context": market_context.to_dict() if market_context else None,
+    }
     return (
-        "Analise o setup DIVAP abaixo. Use APENAS os números fornecidos.\n\n"
+        "Analise o setup DIVAP e o contexto de mercado abaixo. "
+        "Use APENAS os números fornecidos. "
+        "Cruze setup técnico com sentimento, HTF, macro e notícias como um trader profissional.\n\n"
         f"```json\n{json.dumps(payload, indent=2, default=_decimal_default)}\n```"
     )
 

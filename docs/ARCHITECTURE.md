@@ -9,6 +9,8 @@ Binance (REST) → Ingestão → TimescaleDB
                     ↓
               Scanner DIVAP (D-V-A-P)
                     ↓
+         Market Context (Fear&Greed, macro, HTF, news)
+                    ↓
          ┌──────────┴──────────┐
          ↓                     ↓
     LLM Analyzer          Telegram Alerts
@@ -23,7 +25,8 @@ Binance (REST) → Ingestão → TimescaleDB
 | `data/` | Coleta OHLCV, persistência, cache Redis |
 | `indicators/` | Cálculos técnicos puros (sem lógica de negócio) |
 | `detection/` | Orquestra critérios DIVAP → `DIVAPSignal` |
-| `analysis/` | Validação qualitativa via GPT-4o |
+| `context/` | Sentimento, Fear & Greed, macro, notícias, score pré-LLM |
+| `analysis/` | Validação qualitativa via GPT-4o (setup + contexto Apolo) |
 | `alerts/` | Formatação e envio Telegram; Celery Beat |
 | `execution/` | Stubs Fase 3 (broker, risk manager) |
 | `api/` | REST com envelope `{ success, data, error, meta }` |

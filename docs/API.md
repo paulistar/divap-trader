@@ -37,6 +37,14 @@ Health check.
 }
 ```
 
+### `GET /context/{symbol}`
+
+Contexto de mercado para validação pré-entrada (Fear & Greed, macro, HTF, notícias).
+
+**Query:** `timeframe` (15m|1h|4h|1d), `direction` (buy|sell)
+
+**Resposta `data`:** `fear_greed`, `global_market`, `htf_trends`, `macro_indices`, `news_headlines`, `context_score`, `context_verdict`, `risk_flags`
+
 ### `POST /analyze/{symbol}`
 
 Scan manual de um ativo. Query: `timeframe` (15m|1h|4h|1d), `with_llm` (bool).

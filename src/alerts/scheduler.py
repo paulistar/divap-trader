@@ -5,6 +5,7 @@ import logging
 from src.alerts.formatter import format_divap_alert
 from src.alerts.telegram import TelegramNotifier
 from src.analysis.llm_analyzer import LLMAnalyzer
+from src.context.collector import collect_market_context
 from src.core.config import settings
 from src.core.constants import DEFAULT_SYMBOLS, DEFAULT_TIMEFRAMES, PRIORITY_TIMEFRAMES
 from src.core.celery_app import celery_app
@@ -58,16 +59,20 @@ def run_divap_scan(
             signals_found.append(key)
             logger.info("DIVAP signal detected: %s (alert #%s)", key, alert_id)
 
+            market_context = collect_market_context(
+                symbol, timeframe, signal.direction
+            )
+
             analysis_text: str | None = None
             if use_llm and settings.openai_api_key:
                 try:
-                    analysis_text = analyzer.analyze(signal)
+                    analysis_text = analyzer.analyze(signal, market_context)
                     alert_repo.save_analysis(alert_id, analysis_text, settings.openai_model)
                 except AnalysisError as exc:
                     logger.warning("LLM analysis skipped for %s: %s", key, exc)
 
             if notify and notifier.is_configured():
-                message = format_divap_alert(signal, analysis_text)
+                message = format_divap_alert(signal, analysis_text, market_context)
                 notifier.send(message)
 
     return {

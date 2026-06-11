@@ -5,6 +5,7 @@ from openai import OpenAI
 from src.core.config import settings
 from src.core.constants import MIN_CONFLUENCES_FOR_ALERT
 from src.core.exceptions import AnalysisError
+from src.context.models import MarketContext
 from src.detection.divap_scanner import DIVAPSignal
 from src.analysis.report_generator import build_user_message, load_system_prompt
 
@@ -23,7 +24,11 @@ class LLMAnalyzer:
             self._client = OpenAI(api_key=settings.openai_api_key)
         return self._client
 
-    def analyze(self, signal: DIVAPSignal) -> str:
+    def analyze(
+        self,
+        signal: DIVAPSignal,
+        market_context: MarketContext | None = None,
+    ) -> str:
         if signal.criteria.count < MIN_CONFLUENCES_FOR_ALERT:
             raise AnalysisError(
                 f"LLM analysis requires >= {MIN_CONFLUENCES_FOR_ALERT} confluences"
@@ -34,7 +39,10 @@ class LLMAnalyzer:
                 model=settings.openai_model,
                 messages=[
                     {"role": "system", "content": load_system_prompt()},
-                    {"role": "user", "content": build_user_message(signal)},
+                    {
+                        "role": "user",
+                        "content": build_user_message(signal, market_context),
+                    },
                 ],
                 temperature=0.3,
             )

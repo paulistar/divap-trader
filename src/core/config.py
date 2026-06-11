@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     binance_api_secret: str = Field(default="", alias="BINANCE_API_SECRET")
     binance_use_testnet: bool = Field(default=True, alias="BINANCE_USE_TESTNET")
 
+    context_enabled: bool = Field(default=True, alias="CONTEXT_ENABLED")
+    context_news_limit: int = Field(default=5, alias="CONTEXT_NEWS_LIMIT")
+    cryptopanic_api_key: str = Field(default="", alias="CRYPTOPANIC_API_KEY")
+
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o", alias="OPENAI_MODEL")
     openai_model_triage: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL_TRIAGE")

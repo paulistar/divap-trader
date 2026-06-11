@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from src.core.constants import BANK_ALLOCATION_PCT
+from src.context.models import MarketContext
 from src.detection.divap_scanner import DIVAPSignal
 
 
@@ -8,7 +9,11 @@ def _fmt_price(value: Decimal) -> str:
     return f"{value:.2f}"
 
 
-def format_divap_alert(signal: DIVAPSignal, analysis: str | None = None) -> str:
+def format_divap_alert(
+    signal: DIVAPSignal,
+    analysis: str | None = None,
+    market_context: MarketContext | None = None,
+) -> str:
     bank = BANK_ALLOCATION_PCT.get(signal.timeframe, (4, 6))
     direction_label = "COMPRA" if signal.direction == "buy" else "VENDA"
     confidence_label = "ALTA" if signal.confidence == "high" else "MÉDIA"
@@ -35,6 +40,20 @@ def format_divap_alert(signal: DIVAPSignal, analysis: str | None = None) -> str:
         f"<b>Checklist D-V-A-P:</b>\n{checklist}\n\n"
         f"💰 Banca sugerida: {bank[0]}–{bank[1]}% (timeframe {signal.timeframe})"
     )
+
+    if market_context:
+        fg = market_context.fear_greed
+        fg_line = (
+            f"{fg.value} ({fg.classification})" if fg else "N/A"
+        )
+        message += (
+            f"\n\n<b>Contexto mercado:</b>\n"
+            f"Score: {market_context.context_score}/100 | "
+            f"Veredito: {market_context.context_verdict}\n"
+            f"Fear &amp; Greed: {fg_line}\n"
+            f"HTF 1d/1w: {market_context.htf_trends.get('1d', '?')}/"
+            f"{market_context.htf_trends.get('1w', '?')}"
+        )
 
     if analysis:
         truncated = analysis[:1500] + "..." if len(analysis) > 1500 else analysis
