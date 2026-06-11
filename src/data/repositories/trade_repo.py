@@ -64,6 +64,14 @@ SELECT_TRADE_SQL = """
 SELECT * FROM trades WHERE id = %s
 """
 
+PNL_HISTORY_SQL = """
+SELECT id, closed_at, pnl_usdt, pnl_pct
+FROM trades
+WHERE status = 'closed' AND closed_at IS NOT NULL
+ORDER BY closed_at ASC
+LIMIT %s
+"""
+
 STATS_SQL = """
 SELECT
     COUNT(*) FILTER (WHERE status = 'closed') AS closed_count,
@@ -217,6 +225,12 @@ class TradeRepository:
                 cur.execute(SELECT_TRADES_SQL, (limit, offset))
                 rows = cur.fetchall()
         return [self._row_to_record(row) for row in rows]
+
+    def pnl_history(self, limit: int = 100) -> list[dict]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(PNL_HISTORY_SQL, (limit,))
+                return list(cur.fetchall())
 
     def get_trade(self, trade_id: int) -> TradeRecord | None:
         with self._connection() as conn:

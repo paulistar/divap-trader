@@ -9,6 +9,7 @@ from src.execution.trade_executor import TradeExecutor
 from src.analysis.llm_analyzer import LLMAnalyzer
 from src.context.collector import collect_market_context
 from src.core.config import settings
+from src.core.scan_state import record_scan
 from src.core.constants import DEFAULT_SYMBOLS, DEFAULT_TIMEFRAMES, PRIORITY_TIMEFRAMES
 from src.core.celery_app import celery_app
 from src.core.exceptions import AnalysisError, ExchangeError
@@ -66,14 +67,14 @@ def run_divap_scan(
                 )
                 continue
 
-            alert_id = alert_repo.save_signal(signal)
-            key = f"{symbol}:{timeframe}"
-            signals_found.append(key)
-            logger.info("DIVAP signal detected: %s (alert #%s)", key, alert_id)
-
             market_context = collect_market_context(
                 symbol, timeframe, signal.direction
             )
+
+            alert_id = alert_repo.save_signal(signal, market_context)
+            key = f"{symbol}:{timeframe}"
+            signals_found.append(key)
+            logger.info("DIVAP signal detected: %s (alert #%s)", key, alert_id)
 
             analysis_text: str | None = None
             if use_llm and settings.openai_api_key:
@@ -107,4 +108,6 @@ def run_divap_scan(
 def scan_all_symbols() -> dict[str, int | list[str]]:
     """Periodic scan — priority timeframes first."""
     logger.info("Starting DIVAP periodic scan")
-    return run_divap_scan(timeframes=PRIORITY_TIMEFRAMES)
+    result = run_divap_scan(timeframes=PRIORITY_TIMEFRAMES)
+    record_scan(result)
+    return result

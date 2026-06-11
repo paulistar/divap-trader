@@ -3,156 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d0d0d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>DIVAP Trader — Painel</title>
-  <style>
-    :root {
-      --bg: #0d0d0d;
-      --bg-card: #171717;
-      --bg-muted: #262626;
-      --text: #fafafa;
-      --text-muted: #a3a3a3;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --border: #333;
-      --radius: 10px;
-      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      min-height: 100vh;
-    }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 1.25rem; }
-    header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--border);
-    }
-    h1 { font-size: 1.35rem; font-weight: 600; }
-    .subtitle { color: var(--text-muted); font-size: 0.85rem; }
-    .badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .badge {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.6rem;
-      border-radius: 999px;
-      background: var(--bg-muted);
-      border: 1px solid var(--border);
-    }
-    .badge.ok { color: var(--success); border-color: #166534; }
-    .badge.warn { color: var(--warning); border-color: #92400e; }
-    .badge.off { color: var(--text-muted); }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-    .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1rem;
-    }
-    .card-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .card-value { font-size: 1.5rem; font-weight: 600; margin-top: 0.25rem; }
-    .card-value.positive { color: var(--success); }
-    .card-value.negative { color: var(--error); }
-    section { margin-bottom: 1.5rem; }
-    section h2 {
-      font-size: 0.95rem;
-      margin-bottom: 0.75rem;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-    .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th, td { padding: 0.65rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
-    th { background: var(--bg-muted); color: var(--text-muted); font-weight: 500; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255,255,255,0.02); }
-    .empty { color: var(--text-muted); padding: 1.5rem; text-align: center; }
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    button, .btn {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 0.45rem 0.9rem;
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-    button:hover { background: var(--accent-hover); }
-    button.secondary { background: var(--bg-muted); color: var(--text); border: 1px solid var(--border); }
-    button.secondary:hover { background: #333; }
-    input[type="password"], input[type="text"] {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 6px;
-      padding: 0.5rem 0.75rem;
-      font-size: 0.85rem;
-      min-width: 220px;
-    }
-    .login-panel {
-      max-width: 420px;
-      margin: 4rem auto;
-      padding: 2rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-    .login-panel h2 { margin-bottom: 0.5rem; font-size: 1.1rem; }
-    .login-panel p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem; }
-    .login-panel form { display: flex; flex-direction: column; gap: 0.75rem; }
-    .error-banner {
-      background: rgba(239,68,68,0.15);
-      border: 1px solid var(--error);
-      color: #fca5a5;
-      padding: 0.75rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-      display: none;
-    }
-    .error-banner.show { display: block; }
-    footer {
-      margin-top: 2rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border);
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    .tag-buy { color: var(--success); }
-    .tag-sell { color: var(--error); }
-    .tag-high { font-weight: 600; }
-    .tag-medium { color: var(--warning); }
-    .hidden { display: none !important; }
-    @media (max-width: 600px) {
-      .card-value { font-size: 1.25rem; }
-      th, td { padding: 0.5rem; font-size: 0.8rem; }
-    }
-  </style>
+  <link rel="manifest" href="/dashboard/static/manifest.webmanifest" />
+  <link rel="icon" href="/dashboard/static/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/dashboard/static/icon.svg" />
+  <link rel="stylesheet" href="/dashboard/static/dashboard.css" />
 </head>
 <body>
   <div id="login-view" class="wrap">
@@ -164,7 +22,7 @@
         <input type="password" id="api-key-input" placeholder="DASHBOARD_TOKEN" autocomplete="off" required />
         <button type="submit">Entrar no painel</button>
       </form>
-      <p style="margin-top:1rem;font-size:0.75rem;">Configure em Easypanel → Environment → <code>DASHBOARD_TOKEN</code>. A API_KEY longa é para integrações (curl/scripts), não precisa usar aqui.</p>
+      <p style="margin-top:1rem;font-size:0.75rem;">Configure em Easypanel → Environment → <code>DASHBOARD_TOKEN</code>.</p>
     </div>
   </div>
 
@@ -178,30 +36,52 @@
     </header>
 
     <div class="error-banner" id="error-banner"></div>
+    <div class="success-banner" id="success-banner"></div>
 
     <div class="toolbar">
       <button type="button" id="refresh-btn">Atualizar agora</button>
+      <button type="button" class="secondary" id="scan-btn">Disparar scan</button>
       <button type="button" class="secondary" id="logout-btn">Sair</button>
       <span class="subtitle" id="refresh-label"></span>
     </div>
 
+    <section>
+      <h2>Mercado agora</h2>
+      <div class="grid grid-market" id="market-grid"></div>
+    </section>
+
     <div class="grid" id="stats-grid"></div>
 
-    <section>
-      <h2>Trades</h2>
+    <section id="open-trades-section" class="section-open hidden">
+      <h2>Trades abertos</h2>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Par</th>
-              <th>TF</th>
-              <th>Lado</th>
-              <th>Status</th>
-              <th>Entrada</th>
-              <th>PnL</th>
-              <th>Modo</th>
-              <th>Quando</th>
+              <th>ID</th><th>Par</th><th>TF</th><th>Lado</th><th>Status</th>
+              <th>Entrada</th><th>PnL</th><th>Modo</th><th>Quando</th>
+            </tr>
+          </thead>
+          <tbody id="open-trades-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="pnl-chart-section" class="hidden">
+      <h2>PnL acumulado</h2>
+      <div class="chart-wrap">
+        <canvas id="pnl-chart"></canvas>
+      </div>
+    </section>
+
+    <section>
+      <h2>Histórico de trades</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Par</th><th>TF</th><th>Lado</th><th>Status</th>
+              <th>Entrada</th><th>PnL</th><th>Modo</th><th>Quando</th>
             </tr>
           </thead>
           <tbody id="trades-body"></tbody>
@@ -211,19 +91,43 @@
 
     <section>
       <h2>Alertas DIVAP</h2>
+      <div class="filters">
+        <label>Par
+          <select id="filter-symbol">
+            <option value="">Todos</option>
+            <option value="BTCUSDT">BTC</option>
+            <option value="ETHUSDT">ETH</option>
+            <option value="SOLUSDT">SOL</option>
+            <option value="XRPUSDT">XRP</option>
+          </select>
+        </label>
+        <label>Timeframe
+          <select id="filter-tf">
+            <option value="">Todos</option>
+            <option value="1h">1h</option>
+            <option value="4h">4h</option>
+            <option value="1d">1d</option>
+          </select>
+        </label>
+        <label>Confiança
+          <select id="filter-conf">
+            <option value="">Todas</option>
+            <option value="high">Alta</option>
+            <option value="medium">Média</option>
+          </select>
+        </label>
+        <label style="flex-direction:row;align-items:center;gap:0.35rem;margin-top:1.1rem;">
+          <input type="checkbox" id="filter-24h" />
+          Últimas 24h
+        </label>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Par</th>
-              <th>TF</th>
-              <th>Lado</th>
-              <th>Conf.</th>
-              <th>Entrada</th>
-              <th>Stop</th>
-              <th>RSI</th>
-              <th>Quando</th>
+              <th>ID</th><th>Par</th><th>TF</th><th>Lado</th><th>Conf.</th>
+              <th>Score</th><th>Veredito</th><th>HTF</th><th>F&G</th><th>Exec.</th>
+              <th>Entrada</th><th>Setup</th><th>Quando</th>
             </tr>
           </thead>
           <tbody id="alerts-body"></tbody>
@@ -233,231 +137,12 @@
 
     <footer>
       <span id="footer-updated">—</span>
+      <span id="scan-status">—</span>
       <span>Auto-refresh: 30s · <a href="/health" style="color:var(--accent)">/health</a></span>
     </footer>
   </div>
 
-  <script>
-    const REFRESH_MS = 30000;
-    let refreshTimer = null;
-
-    const loginView = document.getElementById("login-view");
-    const appView = document.getElementById("app-view");
-    const errorBanner = document.getElementById("error-banner");
-    const loginError = document.getElementById("login-error");
-
-    // Limpa chave antiga (versão anterior usava localStorage)
-    try { localStorage.removeItem("divap_api_key"); } catch (_) {}
-
-    function showError(msg) {
-      errorBanner.textContent = msg;
-      errorBanner.classList.add("show");
-    }
-
-    function hideError() {
-      errorBanner.classList.remove("show");
-    }
-
-    function showLoginError(msg) {
-      if (!loginError) return;
-      loginError.textContent = msg;
-      loginError.classList.add("show");
-    }
-
-    function hideLoginError() {
-      if (!loginError) return;
-      loginError.classList.remove("show");
-    }
-
-    async function fetchDashboard() {
-      const res = await fetch("/dashboard/data?limit=15", { credentials: "same-origin" });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.detail || body.error || `Erro ${res.status}`);
-      }
-      return body;
-    }
-
-    async function login(secret) {
-      const res = await fetch("/dashboard/auth", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.detail || "Chave inválida");
-      }
-    }
-
-    async function logoutSession() {
-      await fetch("/dashboard/logout", { method: "POST", credentials: "same-origin" });
-    }
-
-    function fmtNum(val, digits = 2) {
-      if (val == null || val === "") return "—";
-      const n = Number(val);
-      if (Number.isNaN(n)) return val;
-      return n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
-    }
-
-    function fmtDate(iso) {
-      if (!iso) return "—";
-      return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-    }
-
-    function dirLabel(d) {
-      return d === "buy" ? '<span class="tag-buy">Compra</span>' : '<span class="tag-sell">Venda</span>';
-    }
-
-    function confLabel(c) {
-      if (c === "high") return '<span class="tag-high">Alta</span>';
-      if (c === "medium") return '<span class="tag-medium">Média</span>';
-      return c || "—";
-    }
-
-    function statusLabel(s) {
-      const map = { open: "Aberto", closed: "Fechado", simulated: "Simulado" };
-      return map[s] || s || "—";
-    }
-
-    function renderBadges(health, stats) {
-      const el = document.getElementById("status-badges");
-      const online = health?.status === "ok";
-      const testnet = stats?.trading_mode === "testnet";
-      const trading = stats?.trading_enabled;
-      el.innerHTML = `
-        <span class="badge ${online ? "ok" : "off"}">${online ? "● Online" : "○ Offline"}</span>
-        <span class="badge ${testnet ? "warn" : ""}">${testnet ? "Testnet" : stats?.trading_mode || "—"}</span>
-        <span class="badge ${trading ? "ok" : "off"}">Trading ${trading ? "ON" : "OFF"}</span>
-      `;
-    }
-
-    function renderStats(stats) {
-      const d = stats || {};
-      const pnl = Number(d.total_pnl_usdt || 0);
-      const pnlClass = pnl > 0 ? "positive" : pnl < 0 ? "negative" : "";
-      document.getElementById("stats-grid").innerHTML = `
-        <div class="card"><div class="card-label">Win rate</div><div class="card-value">${fmtNum(d.win_rate_pct, 1)}%</div></div>
-        <div class="card"><div class="card-label">PnL total</div><div class="card-value ${pnlClass}">${fmtNum(pnl)} USDT</div></div>
-        <div class="card"><div class="card-label">Trades fechados</div><div class="card-value">${d.closed_count ?? 0}</div></div>
-        <div class="card"><div class="card-label">Abertos</div><div class="card-value">${d.open_count ?? 0}</div></div>
-        <div class="card"><div class="card-label">Vitórias / Derrotas</div><div class="card-value">${d.wins ?? 0} / ${d.losses ?? 0}</div></div>
-        <div class="card"><div class="card-label">Taxas</div><div class="card-value">${fmtNum(d.total_fees_usdt)} USDT</div></div>
-      `;
-    }
-
-    function renderTrades(trades) {
-      const rows = trades || [];
-      const tbody = document.getElementById("trades-body");
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty">Nenhum trade executado ainda</td></tr>';
-        return;
-      }
-      tbody.innerHTML = rows.map(t => {
-        const pnl = t.pnl_usdt != null ? Number(t.pnl_usdt) : null;
-        const pnlHtml = pnl != null
-          ? `<span class="${pnl >= 0 ? "tag-buy" : "tag-sell"}">${fmtNum(pnl)}</span>`
-          : "—";
-        return `<tr>
-          <td>#${t.id}</td>
-          <td>${t.symbol}</td>
-          <td>${t.timeframe}</td>
-          <td>${dirLabel(t.direction)}</td>
-          <td>${statusLabel(t.status)}</td>
-          <td>${fmtNum(t.entry_price)}</td>
-          <td>${pnlHtml}</td>
-          <td>${t.trading_mode || "—"}</td>
-          <td>${fmtDate(t.opened_at || t.created_at)}</td>
-        </tr>`;
-      }).join("");
-    }
-
-    function renderAlerts(alerts) {
-      const rows = alerts || [];
-      const tbody = document.getElementById("alerts-body");
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty">Nenhum alerta registrado</td></tr>';
-        return;
-      }
-      tbody.innerHTML = rows.map(a => `<tr>
-        <td>#${a.id}</td>
-        <td>${a.symbol}</td>
-        <td>${a.timeframe}</td>
-        <td>${dirLabel(a.direction)}</td>
-        <td>${confLabel(a.confidence)}</td>
-        <td>${fmtNum(a.entry_price)}</td>
-        <td>${fmtNum(a.stop_loss)}</td>
-        <td>${a.rsi_value != null ? fmtNum(a.rsi_value, 1) : "—"}</td>
-        <td>${fmtDate(a.created_at)}</td>
-      </tr>`).join("");
-    }
-
-    async function loadDashboard() {
-      hideError();
-      try {
-        const payload = await fetchDashboard();
-        const d = payload.data || {};
-        renderBadges(d.health, d.stats);
-        renderStats(d.stats);
-        renderTrades(d.trades);
-        renderAlerts(d.alerts);
-        document.getElementById("footer-updated").textContent =
-          "Atualizado: " + new Date().toLocaleString("pt-BR");
-        document.getElementById("refresh-label").textContent = "Próximo refresh em 30s";
-      } catch (err) {
-        showError(err.message || "Falha ao carregar dados");
-        if (String(err.message).toLowerCase().includes("sessão") || String(err.message).includes("401")) {
-          setTimeout(showLogin, 1200);
-        }
-      }
-    }
-
-    function showApp() {
-      loginView.classList.add("hidden");
-      appView.classList.remove("hidden");
-      loadDashboard();
-      if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(loadDashboard, REFRESH_MS);
-    }
-
-    function showLogin() {
-      appView.classList.add("hidden");
-      loginView.classList.remove("hidden");
-      if (refreshTimer) clearInterval(refreshTimer);
-    }
-
-    document.getElementById("login-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      hideLoginError();
-      const key = document.getElementById("api-key-input").value.trim();
-      if (!key) return;
-      try {
-        await login(key);
-        document.getElementById("api-key-input").value = "";
-        showApp();
-      } catch (err) {
-        showLoginError(err.message || "Chave inválida");
-      }
-    });
-
-    document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
-    document.getElementById("logout-btn").addEventListener("click", async () => {
-      await logoutSession();
-      showLogin();
-    });
-
-    async function bootstrap() {
-      try {
-        await fetchDashboard();
-        showApp();
-      } catch (_) {
-        showLogin();
-      }
-    }
-
-    bootstrap();
-  </script>
+  <div id="modal-root"></div>
+  <script src="/dashboard/static/dashboard.js" defer></script>
 </body>
 </html>

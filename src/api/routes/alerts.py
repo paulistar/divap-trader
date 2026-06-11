@@ -29,6 +29,11 @@ def _alert_to_dict(record) -> dict:
         "fibo_level": str(record.fibo_level) if record.fibo_level else None,
         "acknowledged": record.acknowledged,
         "created_at": record.created_at.isoformat(),
+        "context_score": record.context_score,
+        "context_verdict": record.context_verdict,
+        "fear_greed": record.fear_greed,
+        "htf_1d": record.htf_1d,
+        "htf_1w": record.htf_1w,
     }
 
 

@@ -1,0 +1,19 @@
+{
+  "name": "DIVAP Trader",
+  "short_name": "DIVAP",
+  "description": "Painel de acompanhamento DIVAP — testnet Binance",
+  "start_url": "/dashboard",
+  "scope": "/dashboard/",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/dashboard/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

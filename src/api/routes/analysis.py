@@ -3,6 +3,8 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from src.core.scan_state import record_scan
+
 logger = logging.getLogger(__name__)
 
 from src.alerts.scheduler import run_divap_scan
@@ -74,4 +76,5 @@ async def scan_all(
 ) -> ApiResponse[dict]:
     """Trigger full scan (same logic as Celery task)."""
     result = run_divap_scan(notify=notify)
+    record_scan(result)
     return ApiResponse(success=True, data=result)

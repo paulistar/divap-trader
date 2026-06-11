@@ -1,9 +1,10 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
+from src.alerts.scheduler import run_divap_scan
 from src.api.dashboard_auth import (
     COOKIE_NAME,
     SESSION_MAX_AGE,
@@ -12,16 +13,24 @@ from src.api.dashboard_auth import (
     validate_dashboard_secret,
     verify_session_token,
 )
-from src.api.routes.alerts import _alert_to_dict
+from src.api.dashboard_service import (
+    alert_to_dashboard_dict,
+    build_market_overview,
+    build_pnl_series,
+    fetch_testnet_balance,
+    get_scan_status_payload,
+)
 from src.api.routes.trades import _trade_to_dict
 from src.api.schemas import ApiResponse, HealthData
 from src.core.config import settings
+from src.core.scan_state import record_scan
 from src.data.repositories.alert_repo import AlertRepository
 from src.data.repositories.trade_repo import TradeRepository
 
 router = APIRouter(tags=["dashboard"])
 
-_DASHBOARD_HTML = Path(__file__).resolve().parent.parent / "static" / "dashboard.html"
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+_DASHBOARD_HTML = _STATIC_DIR / "dashboard.html"
 
 
 class DashboardAuthBody(BaseModel):
@@ -60,6 +69,30 @@ async def dashboard_page() -> HTMLResponse:
     return HTMLResponse(_DASHBOARD_HTML.read_text(encoding="utf-8"))
 
 
+@router.get("/dashboard/static/{filename}", include_in_schema=False)
+async def dashboard_static(filename: str) -> FileResponse:
+    allowed = {
+        "dashboard.css",
+        "dashboard.js",
+        "manifest.webmanifest",
+        "sw.js",
+        "icon.svg",
+    }
+    if filename not in allowed:
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+    path = _STATIC_DIR / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+    media = {
+        "dashboard.css": "text/css",
+        "dashboard.js": "application/javascript",
+        "manifest.webmanifest": "application/manifest+json",
+        "sw.js": "application/javascript",
+        "icon.svg": "image/svg+xml",
+    }
+    return FileResponse(path, media_type=media.get(filename))
+
+
 @router.post("/dashboard/auth", include_in_schema=False)
 async def dashboard_auth(body: DashboardAuthBody, response: Response) -> ApiResponse[dict]:
     if not validate_dashboard_secret(body.secret):
@@ -90,20 +123,101 @@ async def dashboard_logout(response: Response) -> ApiResponse[dict]:
 @router.get("/dashboard/data", include_in_schema=False)
 async def dashboard_data(
     _: None = Depends(require_dashboard_session),
-    limit: int = 15,
+    limit: int = Query(default=30, ge=1, le=100),
+    symbol: str | None = None,
+    timeframe: str | None = None,
+    confidence: str | None = None,
+    hours: int | None = Query(default=None, ge=1, le=168),
 ) -> ApiResponse[dict]:
     alert_repo = AlertRepository()
     trade_repo = TradeRepository()
 
-    alerts = alert_repo.list_alerts(limit=limit, offset=0)
-    trades = trade_repo.list_trades(limit=limit, offset=0)
+    sym = symbol.upper().replace("/", "") if symbol else None
+    alerts = alert_repo.list_alerts(
+        limit=limit,
+        offset=0,
+        symbol=sym,
+        timeframe=timeframe,
+        confidence=confidence,
+        within_hours=hours,
+    )
+    open_trades = trade_repo.list_open_trades()
+    all_trades = trade_repo.list_trades(limit=limit, offset=0)
+    closed_trades = [t for t in all_trades if t.status == "closed"]
 
     return ApiResponse(
         success=True,
         data={
             "health": HealthData(status="ok", app_env=settings.app_env).model_dump(),
             "stats": _build_stats(),
-            "trades": [_trade_to_dict(t) for t in trades],
-            "alerts": [_alert_to_dict(a) for a in alerts],
+            "balance": fetch_testnet_balance(),
+            "market": build_market_overview(),
+            "scan": get_scan_status_payload(),
+            "open_trades": [_trade_to_dict(t) for t in open_trades],
+            "trades": [_trade_to_dict(t) for t in closed_trades],
+            "alerts": [alert_to_dashboard_dict(a) for a in alerts],
+            "pnl_series": build_pnl_series(),
         },
     )
+
+
+@router.get("/dashboard/alerts/{alert_id}", include_in_schema=False)
+async def dashboard_alert_detail(
+    alert_id: int,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    repo = AlertRepository()
+    alert = repo.get_alert(alert_id)
+    if alert is None:
+        raise HTTPException(status_code=404, detail="Alerta não encontrado")
+
+    if alert.context_score is None and alert.context_verdict is None:
+        from src.context.collector import collect_market_context
+
+        try:
+            ctx = collect_market_context(alert.symbol, alert.timeframe, alert.direction)
+            repo.update_context(alert_id, ctx)
+            alert = repo.get_alert(alert_id) or alert
+        except Exception:
+            pass
+
+    analysis = repo.get_analysis(alert_id)
+    return ApiResponse(
+        success=True,
+        data={
+            "alert": alert_to_dashboard_dict(alert),
+            "analysis": analysis,
+        },
+    )
+
+
+@router.get("/dashboard/trades/{trade_id}", include_in_schema=False)
+async def dashboard_trade_detail(
+    trade_id: int,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    repo = TradeRepository()
+    trade = repo.get_trade(trade_id)
+    if trade is None:
+        raise HTTPException(status_code=404, detail="Trade não encontrado")
+    alert_ctx = None
+    if trade.alert_id:
+        alert = AlertRepository().get_alert(trade.alert_id)
+        if alert:
+            alert_ctx = alert_to_dashboard_dict(alert)
+    return ApiResponse(
+        success=True,
+        data={
+            "trade": _trade_to_dict(trade),
+            "alert_context": alert_ctx,
+        },
+    )
+
+
+@router.post("/dashboard/scan", include_in_schema=False)
+async def dashboard_trigger_scan(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    result = run_divap_scan(notify=True)
+    record_scan(result)
+    return ApiResponse(success=True, data=result)

@@ -88,6 +88,11 @@ SCHEMA_STATEMENTS: list[str] = [
     """,
     "CREATE INDEX IF NOT EXISTS idx_trades_status ON trades (status)",
     "CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades (symbol, created_at DESC)",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS context_score INTEGER",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS context_verdict TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS fear_greed INTEGER",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS htf_1d TEXT",
+    "ALTER TABLE alerts ADD COLUMN IF NOT EXISTS htf_1w TEXT",
 ]
 
 

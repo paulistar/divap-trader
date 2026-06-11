@@ -18,7 +18,7 @@ def test_dashboard_page_returns_html() -> None:
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert "DIVAP Trader" in response.text
-    assert "dashboard/data" in response.text or "fetchDashboard" in response.text
+    assert "dashboard.js" in response.text or "fetchDashboard" in response.text
 
 
 def test_session_token_roundtrip() -> None:
