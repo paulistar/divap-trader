@@ -24,5 +24,9 @@ celery_app.conf.update(
             "task": "src.execution.tasks.monitor_open_trades",
             "schedule": 300.0,  # 5 min
         },
+        "beat-heartbeat": {
+            "task": "src.execution.tasks.beat_heartbeat",
+            "schedule": 60.0,
+        },
     },
 )

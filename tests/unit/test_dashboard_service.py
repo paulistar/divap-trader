@@ -41,8 +41,10 @@ def test_record_and_get_scan_status() -> None:
     mock_client.get.side_effect = [
         "2026-06-11T12:00:00+00:00",
         '{"signals": 2, "errors": 0}',
+        None,
     ]
     with patch("src.core.scan_state._client", return_value=mock_client):
-        status = get_scan_status()
+        with patch("src.core.beat_state._client", return_value=mock_client):
+            status = get_scan_status()
         assert status["last_signals"] == 2
         assert status["interval_seconds"] == 900

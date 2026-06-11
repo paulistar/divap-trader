@@ -194,15 +194,55 @@ function drawMiniChart(canvas, entry, stop, targets) {
   ctx.fill();
 }
 
-function renderBadges(health, stats) {
+function renderBadges(health, stats, scan) {
   const el = document.getElementById("status-badges");
   const online = health?.status === "ok";
   const testnet = stats?.trading_mode === "testnet";
   const trading = stats?.trading_enabled;
+  const beat = scan?.beat_active;
+  const beatTitle = beat
+    ? `Beat ativo · visto há ${fmtDuration(scan?.beat_seconds_since ?? 0)}`
+    : scan?.beat_seconds_since != null
+      ? `Beat inativo · último sinal há ${fmtDuration(scan.beat_seconds_since)}`
+      : "Beat ainda sem heartbeat — aguarde ~1 min após deploy";
   el.innerHTML = `
     <span class="badge ${online ? "ok" : "off"}">${online ? "● Online" : "○ Offline"}</span>
     <span class="badge ${testnet ? "warn" : ""}">${testnet ? "Testnet" : stats?.trading_mode || "—"}</span>
     <span class="badge ${trading ? "ok" : "off"}">Trading ${trading ? "ON" : "OFF"}</span>
+    <span class="badge ${beat ? "ok beat-pulse" : "off"}" title="${beatTitle.replace(/"/g, "&quot;")}">${beat ? "● Beat ativo" : "○ Beat inativo"}</span>
+  `;
+}
+
+function renderTradingReadiness(readiness) {
+  const panel = document.getElementById("trading-readiness-panel");
+  if (!panel) return;
+  const r = readiness || {};
+  const checks = r.checks || [];
+  if (!checks.length) {
+    panel.innerHTML = '<div class="empty">Carregando validação…</div>';
+    return;
+  }
+  const list = checks.map((c) => `
+    <li class="readiness-item ${c.ok ? "ok" : "fail"}">
+      <span class="readiness-icon">${c.ok ? "✓" : "✗"}</span>
+      <div>
+        <strong>${c.label}</strong>
+        ${c.detail ? `<div class="readiness-detail">${c.detail}</div>` : ""}
+      </div>
+    </li>`).join("");
+  const perf = r.profile_performance || [];
+  const perfHtml = perf.length
+    ? `<div class="readiness-perf">${perf.map((p) =>
+        `<span>${p.name}: ${(p.closed_count ?? 0) + (p.open_count ?? 0)} trades</span>`
+      ).join("")}</div>`
+    : "";
+  panel.innerHTML = `
+    <div class="readiness-header ${r.ready ? "ready" : "pending"}">
+      ${r.ready ? "Pronto para operar na testnet" : "Ajustes necessários"}
+    </div>
+    <ul class="readiness-list">${list}</ul>
+    ${perfHtml}
+    <p class="readiness-hint">${r.hint || ""}</p>
   `;
 }
 
@@ -447,8 +487,9 @@ function renderScan(scan) {
   const since = s.seconds_since_last != null ? `há ${fmtDuration(s.seconds_since_last)}` : "nunca";
   const until = s.seconds_until_next != null ? `~${fmtDuration(s.seconds_until_next)}` : "—";
   const interval = s.interval_seconds ? Math.round(s.interval_seconds / 60) : 15;
+  const beat = s.beat_active ? "beat OK" : "beat —";
   document.getElementById("scan-status").textContent =
-    `Último scan: ${since} · próximo em ${until} · sinais: ${s.last_signals ?? 0} · automático a cada ${interval} min (beat)`;
+    `Último scan: ${since} · próximo em ${until} · sinais: ${s.last_signals ?? 0} · automático a cada ${interval} min · ${beat}`;
 }
 
 function tradeRow(t, clickable = true) {
@@ -684,8 +725,9 @@ async function loadDashboard() {
     const payload = await fetchDashboard();
     const d = payload.data || {};
     lastData = d;
-    renderBadges(d.health, d.stats);
+    renderBadges(d.health, d.stats, d.scan);
     renderScan(d.scan);
+    renderTradingReadiness(d.trading_readiness);
     renderOpenTrades(d.open_trades);
     renderTrades(d.trades);
     renderAlerts(d.alerts);

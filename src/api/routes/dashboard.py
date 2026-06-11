@@ -34,6 +34,7 @@ from src.core.config import settings
 from src.core.scan_state import record_scan
 from src.data.repositories.alert_repo import AlertRepository
 from src.data.repositories.trade_repo import TradeRepository
+from src.trading.readiness import build_trading_readiness
 
 router = APIRouter(tags=["dashboard"])
 
@@ -164,6 +165,7 @@ async def dashboard_data(
             "health": HealthData(status="ok", app_env=settings.app_env).model_dump(),
             "stats": _build_stats(),
             "scan": get_scan_status_payload(),
+            "trading_readiness": build_trading_readiness(),
             "open_trades": [_trade_to_dict(t) for t in open_trades],
             "trades": [_trade_to_dict(t) for t in closed_trades],
             "alerts": [alert_to_dashboard_dict(a) for a in alerts],

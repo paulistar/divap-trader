@@ -8,6 +8,7 @@ from src.alerts.trade_formatter import format_trade_execution
 from src.execution.trade_executor import TradeExecutor
 from src.analysis.llm_analyzer import LLMAnalyzer
 from src.context.collector import collect_market_context
+from src.core.beat_state import record_beat_heartbeat
 from src.core.config import settings
 from src.core.scan_state import record_scan
 from src.core.constants import DEFAULT_SYMBOLS, DEFAULT_TIMEFRAMES, PRIORITY_TIMEFRAMES
@@ -107,6 +108,7 @@ def run_divap_scan(
 @celery_app.task(name="src.alerts.scheduler.scan_all_symbols")
 def scan_all_symbols() -> dict[str, int | list[str]]:
     """Periodic scan — priority timeframes first."""
+    record_beat_heartbeat()
     logger.info("Starting DIVAP periodic scan")
     result = run_divap_scan(timeframes=PRIORITY_TIMEFRAMES)
     record_scan(result)

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import redis
 
+from src.core.beat_state import get_beat_status
 from src.core.config import settings
 
 SCAN_INTERVAL_SECONDS = 900
@@ -60,4 +61,5 @@ def get_scan_status() -> dict:
         "interval_seconds": SCAN_INTERVAL_SECONDS,
         "last_signals": last_result.get("signals", 0),
         "last_errors": last_result.get("errors", 0),
+        **get_beat_status(),
     }
