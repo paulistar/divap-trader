@@ -1,4 +1,5 @@
 from src.context.models import ContextVerdict, MarketContextParts, TrendBias
+from src.core.timeframes import is_ltf
 
 NEGATIVE_NEWS_KEYWORDS = frozenset(
     {
@@ -61,10 +62,10 @@ def assess_market_context(
     score, flags = _apply_htf_alignment(score, flags, signal_direction, htf_1d, "1d")
     score, flags = _apply_htf_alignment(score, flags, signal_direction, htf_1w, "1w")
 
-    if signal_timeframe in ("15m", "1h") and htf_1d == "bearish" and signal_direction == "buy":
+    if is_ltf(signal_timeframe) and htf_1d == "bearish" and signal_direction == "buy":
         flags.append("ltf_buy_vs_htf_bearish")
         score -= 12
-    if signal_timeframe in ("15m", "1h") and htf_1d == "bullish" and signal_direction == "sell":
+    if is_ltf(signal_timeframe) and htf_1d == "bullish" and signal_direction == "sell":
         flags.append("ltf_sell_vs_htf_bullish")
         score -= 12
 

@@ -75,4 +75,11 @@ def should_execute_trade(
     if rr < profile_exec.min_risk_reward:
         return False, f"rr_below_minimum_{rr}"
 
+    if profile is not None and profile.id == "anti_divap":
+        from src.profiles.contrarian import contrarian_setup_aligned
+
+        aligned, contrarian_reason = contrarian_setup_aligned(signal, market_context)
+        if not aligned:
+            return False, contrarian_reason
+
     return True, "ok"

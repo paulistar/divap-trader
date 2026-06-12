@@ -2,14 +2,14 @@ id: position
 name: Position Trader — O Estrategista
 tagline: Macro e tendência
 description: >
-  Posições de médio/longo prazo em 4h e 1d. Foco em BTC, ETH e majors com liquidez.
+  Posições de médio/longo prazo em 4h, 1d e semanal (W1). Foco em BTC, ETH e majors.
   RR mínimo 1:2 — poucas entradas, contexto macro alinhado, paciência operacional.
 execution:
   min_confidence: high
   block_on_reject: true
   min_risk_reward: "2.0"
   max_open_trades: 3
-  allowed_timeframes: ["4h", "1d"]
+  allowed_timeframes: ["4h", "1d", "1w"]
   allocation_multiplier: "0.85"
 advisor:
   ideal_fear_greed_min: 25
@@ -20,7 +20,7 @@ advisor:
   needs_momentum: false
 scan:
   interval_seconds: 3600
-  timeframes: ["4h", "1d"]
+  timeframes: ["4h", "1d", "1w"]
   symbols:
     - BTCUSDT
     - ETHUSDT

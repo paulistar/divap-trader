@@ -33,7 +33,7 @@ def _signal_to_dict(signal: DIVAPSignal) -> dict:
 @router.post("/{symbol}")
 async def analyze_symbol(
     symbol: str,
-    timeframe: Literal["15m", "1h", "4h", "1d"] = "4h",
+    timeframe: Literal["1m", "5m", "15m", "1h", "4h", "1d", "1w"] = "4h",
     with_llm: bool = Query(default=True),
 ) -> ApiResponse[dict]:
     symbol = symbol.upper().replace("/", "")

@@ -43,8 +43,8 @@ CRYPTO_MAJOR_SYMBOLS: tuple[str, ...] = (
     "XRPUSDT",
 )
 
-# Timeframes de scan
-DEFAULT_TIMEFRAMES: tuple[str, ...] = ("15m", "1h", "4h", "1d")
+# Timeframes de scan (fallback global)
+DEFAULT_TIMEFRAMES: tuple[str, ...] = ("1m", "5m", "15m", "1h", "4h", "1d", "1w")
 
 # Prioridade operacional (maior assertividade)
 PRIORITY_TIMEFRAMES: tuple[str, ...] = ("1h", "4h", "1d")
@@ -86,8 +86,11 @@ MIN_CONFLUENCES_HIGH_CONFIDENCE: int = 4
 
 # % da banca por timeframe (skill risk-management)
 BANK_ALLOCATION_PCT: dict[str, tuple[int, int]] = {
+    "1m": (1, 1),
+    "5m": (1, 2),
     "15m": (1, 2),
     "1h": (4, 6),
     "4h": (8, 12),
     "1d": (10, 15),
+    "1w": (12, 18),
 }

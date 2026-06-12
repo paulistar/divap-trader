@@ -79,6 +79,14 @@ def assess_profile(
     if rules.needs_momentum and verdict == "confirm" and (change is None or abs(float(change)) >= 1.5):
         score += 8
 
+    if profile.id == "anti_divap" and fg is not None:
+        if fg <= 20 or fg >= 80:
+            score += 15
+            notes.append(f"Extremo F&G {fg} — favorável ao contrarian")
+        elif 45 <= fg <= 55:
+            score -= 10
+            notes.append("Sentimento neutro — pouco edge contrarian")
+
     score = max(0, min(100, score))
     status = _status_from_score(score)
     detail = ". ".join(notes) if notes else profile.description

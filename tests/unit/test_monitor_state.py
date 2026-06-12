@@ -8,10 +8,10 @@ from src.core.scan_plan import ScanPlan, should_run_interval
 from src.profiles.loader import load_profile
 
 
-def test_caixa_rapido_monitor_interval_two_minutes() -> None:
-    profile = load_profile("caixa_rapido")
+def test_scalper_monitor_interval_one_minute() -> None:
+    profile = load_profile("scalper")
     assert profile is not None
-    assert profile.scan.monitor_interval_seconds == 120
+    assert profile.scan.monitor_interval_seconds == 60
 
 
 def test_should_run_interval_respects_monitor_cadence() -> None:

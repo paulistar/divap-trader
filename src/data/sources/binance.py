@@ -10,6 +10,8 @@ from src.data.sources.interfaces import MarketDataSource
 
 # ccxt timeframe keys
 TIMEFRAME_MAP: dict[str, str] = {
+    "1m": "1m",
+    "5m": "5m",
     "15m": "15m",
     "1h": "1h",
     "4h": "4h",

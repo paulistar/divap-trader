@@ -16,7 +16,7 @@ router = APIRouter(
 @router.get("/{symbol}")
 async def get_market_context(
     symbol: str,
-    timeframe: Literal["15m", "1h", "4h", "1d"] = "4h",
+    timeframe: Literal["1m", "5m", "15m", "1h", "4h", "1d", "1w"] = "4h",
     direction: Literal["buy", "sell"] = "buy",
 ) -> ApiResponse[dict]:
     """Contexto de mercado (sentimento, macro, HTF, notícias) para validação pré-entrada."""

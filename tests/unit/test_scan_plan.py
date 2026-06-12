@@ -9,13 +9,12 @@ from src.core.scan_plan import ScanPlan, get_active_scan_plan, should_run_scan
 from src.profiles.loader import load_profile
 
 
-def test_scalper_includes_15m_and_fast_interval() -> None:
+def test_scalper_includes_m1_m5_and_fast_interval() -> None:
     profile = load_profile("scalper")
     assert profile is not None
-    assert profile.scan.interval_seconds == 300
-    assert profile.scan.monitor_interval_seconds == 120
-    assert "15m" in profile.scan.timeframes
-    assert "1h" in profile.scan.timeframes
+    assert profile.scan.interval_seconds == 180
+    assert profile.scan.monitor_interval_seconds == 60
+    assert profile.scan.timeframes == ("1m", "5m", "15m", "1h")
     assert profile.scan.symbols is not None
     assert "BTCUSDT" in profile.scan.symbols
 
@@ -33,7 +32,8 @@ def test_divap_scan_top20_crypto() -> None:
 def test_position_trader_long_term() -> None:
     profile = load_profile("position")
     assert profile is not None
-    assert profile.scan.timeframes == ("4h", "1d")
+    assert profile.scan.timeframes == ("4h", "1d", "1w")
+    assert profile.execution.allowed_timeframes == ("4h", "1d", "1w")
     assert profile.scan.interval_seconds == 3600
     assert profile.execution.min_risk_reward >= Decimal("2.0")
 
@@ -82,5 +82,5 @@ def test_get_active_scan_plan_uses_bankroll_profile() -> None:
         with patch("src.core.scan_plan.load_profile", return_value=profile):
             plan = get_active_scan_plan()
     assert plan.profile_id == "scalper"
-    assert "15m" in plan.timeframes
-    assert plan.monitor_interval_seconds == 120
+    assert "1m" in plan.timeframes
+    assert plan.monitor_interval_seconds == 60
