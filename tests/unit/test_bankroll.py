@@ -19,7 +19,9 @@ def test_build_profile_performance_includes_all_profiles() -> None:
         perf = build_profile_performance()
     ids = {p["profile_id"] for p in perf}
     assert "divap" in ids
-    assert "conservador" in ids
+    assert "scalper" in ids
+    assert "position" in ids
+    assert "anti_divap" in ids
     divap = next(p for p in perf if p["profile_id"] == "divap")
     assert divap["closed_count"] == 2
     assert divap["win_rate_pct"] == "50.0"

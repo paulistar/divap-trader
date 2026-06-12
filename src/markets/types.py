@@ -11,6 +11,7 @@ class Market(StrEnum):
 
 class Venue(StrEnum):
     BINANCE = "binance"
+    FXCM = "fxcm"
     OANDA = "oanda"
 
 

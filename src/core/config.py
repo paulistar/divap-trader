@@ -54,6 +54,10 @@ class Settings(BaseSettings):
         alias="VAPID_CLAIMS_SUB",
     )
 
+    fxcm_access_token: str = Field(default="", alias="FXCM_ACCESS_TOKEN")
+    fxcm_server: str = Field(default="demo", alias="FXCM_SERVER")
+    fxcm_account_id: str = Field(default="", alias="FXCM_ACCOUNT_ID")
+
     @field_validator("vapid_private_key", mode="before")
     @classmethod
     def normalize_vapid_private_key(cls, value: object) -> object:
@@ -66,6 +70,7 @@ class Settings(BaseSettings):
         "dashboard_token",
         "binance_api_key",
         "binance_api_secret",
+        "fxcm_access_token",
         mode="before",
     )
     @classmethod

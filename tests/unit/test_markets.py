@@ -21,7 +21,7 @@ def test_instrument_from_crypto_symbol() -> None:
 def test_instrument_from_forex_symbol() -> None:
     inst = instrument_from_symbol("EUR_USD")
     assert inst.market == Market.FOREX
-    assert inst.venue == Venue.OANDA
+    assert inst.venue == Venue.FXCM
     assert inst.symbol == "EUR_USD"
 
 
@@ -35,6 +35,11 @@ def test_get_broker_binance() -> None:
     assert isinstance(broker, BinanceBroker)
     assert broker.market == Market.CRYPTO.value
     assert broker.venue == Venue.BINANCE.value
+
+
+def test_get_data_source_fxcm_not_configured() -> None:
+    with pytest.raises(ExchangeError):
+        get_data_source(Venue.FXCM).fetch_ohlcv("EUR_USD", "1h", limit=1)
 
 
 def test_get_broker_oanda_not_implemented() -> None:

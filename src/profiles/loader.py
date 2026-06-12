@@ -15,7 +15,7 @@ from src.profiles.models import (
 )
 
 _PROFILES_DIR = Path(__file__).resolve().parent
-_DEFAULT_ORDER = ("divap", "conservador", "caixa_rapido", "agressivo")
+_DEFAULT_ORDER = ("divap", "scalper", "position", "anti_divap")
 
 
 def _parse_profile(data: dict) -> TradingProfile:

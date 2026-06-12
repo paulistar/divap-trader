@@ -51,7 +51,7 @@ def _build_prompt(
 Perfis (avaliação rule-based):
 {chr(10).join(profiles_block)}
 
-Responda APENAS JSON válido, chaves: divap, conservador, caixa_rapido, agressivo.
+Responda APENAS JSON válido, chaves: {", ".join(snap.profile.id for snap in snapshots)}.
 Cada valor: 1-2 frases em português, direto, para o trader — se é bom momento para aquele estilo AGORA e por quê.
 Não repita números mecanicamente; interprete para leigos."""
 

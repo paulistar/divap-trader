@@ -25,7 +25,7 @@ def instrument_from_symbol(
         else:
             market = Market.CRYPTO
     if venue is None:
-        venue = Venue.OANDA if market == Market.FOREX else Venue.BINANCE
+        venue = Venue.FXCM if market == Market.FOREX else Venue.BINANCE
     if market == Market.CRYPTO:
         normalized = normalized.replace("_", "")
     return Instrument(market=market, venue=venue, symbol=normalized)

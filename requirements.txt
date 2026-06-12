@@ -14,3 +14,4 @@ openai>=1.55.0
 httpx>=0.28.0
 python-dotenv>=1.0.1
 pywebpush>=2.0.0
+fxcmpy @ git+https://github.com/chaipat-ncm/fxcmpy.git

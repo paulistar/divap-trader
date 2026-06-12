@@ -480,13 +480,7 @@ function profileFitClass(status) {
 }
 
 function profileLabel(id) {
-  const map = {
-    divap: "DIVAP",
-    conservador: "Conservador",
-    caixa_rapido: "Caixa rápido",
-    agressivo: "Agressivo",
-  };
-  return map[id] || id || "—";
+  return id || "—";
 }
 
 function renderProfiles(data, insightsMap) {
@@ -575,7 +569,16 @@ function renderBankroll(bankroll, profilesPayload) {
   const b = bankroll || {};
   const select = document.getElementById("active-profile-select");
   const targetInput = document.getElementById("monthly-target-input");
-  if (select && b.active_profile_id) select.value = b.active_profile_id;
+  const profileOptions = profilesPayload?.profiles || [];
+  if (select && profileOptions.length) {
+    const activeId = b.active_profile_id || profileOptions[0].id;
+    select.innerHTML = profileOptions
+      .map((p) => `<option value="${p.id}">${p.name}</option>`)
+      .join("");
+    select.value = activeId;
+  } else if (select && b.active_profile_id) {
+    select.value = b.active_profile_id;
+  }
   if (targetInput && b.monthly_target_usdt != null) targetInput.value = b.monthly_target_usdt;
 
   const progress = b.progress_pct != null ? Math.min(100, Number(b.progress_pct)) : 0;

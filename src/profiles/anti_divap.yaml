@@ -1,0 +1,25 @@
+id: anti_divap
+name: Anti-DIVAP — O Contrarian
+tagline: Hedge do caos
+description: >
+  Contrarian em 4h/1d — exaustão de tendência, divergências contra o crowd.
+  BTC e ETH. RR mínimo 1:2 — poucas posições, ideal em extremos de sentimento.
+execution:
+  min_confidence: high
+  block_on_reject: false
+  min_risk_reward: "2.0"
+  max_open_trades: 2
+  allowed_timeframes: ["4h", "1d"]
+  allocation_multiplier: "0.6"
+advisor:
+  ideal_fear_greed_min: 10
+  ideal_fear_greed_max: 90
+  preferred_verdicts: ["caution", "reject"]
+  min_avg_score: 30
+  volatility: medium
+  needs_momentum: false
+scan:
+  interval_seconds: 1800
+  timeframes: ["4h", "1d"]
+  symbols: ["BTCUSDT", "ETHUSDT"]
+  monitor_interval_seconds: 600

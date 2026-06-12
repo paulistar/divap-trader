@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-# Ativos monitorados no MVP
+# Ativos monitorados no MVP (fallback quando perfil não define symbols)
 DEFAULT_SYMBOLS: tuple[str, ...] = (
     "BTCUSDT",
     "ETHUSDT",
@@ -8,6 +8,39 @@ DEFAULT_SYMBOLS: tuple[str, ...] = (
     "SOLUSDT",
     "XRPUSDT",
     "ADAUSDT",
+)
+
+# Top 20 liquidez crypto (Binance spot USDT) — Perfil DIVAP
+CRYPTO_TOP_20_SYMBOLS: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "BNBUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "ADAUSDT",
+    "DOGEUSDT",
+    "TRXUSDT",
+    "AVAXUSDT",
+    "LINKUSDT",
+    "DOTUSDT",
+    "POLUSDT",
+    "SHIBUSDT",
+    "LTCUSDT",
+    "BCHUSDT",
+    "UNIUSDT",
+    "ATOMUSDT",
+    "XLMUSDT",
+    "NEARUSDT",
+    "ICPUSDT",
+)
+
+# Majors para scalper e position (foco de liquidez)
+CRYPTO_MAJOR_SYMBOLS: tuple[str, ...] = (
+    "BTCUSDT",
+    "ETHUSDT",
+    "BNBUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
 )
 
 # Timeframes de scan

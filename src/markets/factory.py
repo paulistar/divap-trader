@@ -12,6 +12,10 @@ def get_data_source(venue: Venue | None = None) -> MarketDataSource:
         from src.data.sources.binance import BinanceSource
 
         return BinanceSource()
+    if selected == Venue.FXCM:
+        from src.data.sources.fxcm import FxcmSource
+
+        return FxcmSource()
     raise ExchangeError(f"Market data source not implemented for venue: {selected.value}")
 
 
@@ -21,10 +25,14 @@ def get_broker(venue: Venue | None = None) -> ExecutionBroker:
         from src.execution.binance_broker import BinanceBroker
 
         return BinanceBroker()
+    if selected == Venue.FXCM:
+        from src.execution.fxcm_broker import FxcmBroker
+
+        return FxcmBroker()
     raise ExchangeError(f"Execution broker not implemented for venue: {selected.value}")
 
 
 def default_venue_for_market(market: Market) -> Venue:
     if market == Market.FOREX:
-        return Venue.OANDA
+        return Venue.FXCM
     return Venue.BINANCE

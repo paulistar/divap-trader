@@ -1,11 +1,13 @@
 id: divap
-name: DIVAP
-tagline: Swing técnico com confluência
-description: Padrão do sistema — setups 1h/4h/1d com contexto de mercado e confiança alta.
+name: DIVAP — Rei da Validação
+tagline: Sniper de confluência
+description: >
+  Setup DIVAP completo (Divergência, Invalidação, Volume, Ação de Preço, Padrão).
+  Swing em 1h/4h/1d no top 20 crypto. RR mínimo 1:1,5 — só entradas com confluência alta.
 execution:
   min_confidence: high
   block_on_reject: true
-  min_risk_reward: "2.0"
+  min_risk_reward: "1.5"
   max_open_trades: 5
   allowed_timeframes: ["1h", "4h", "1d"]
   allocation_multiplier: "1.0"
@@ -19,4 +21,25 @@ advisor:
 scan:
   interval_seconds: 900
   timeframes: ["1h", "4h", "1d"]
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - BNBUSDT
+    - SOLUSDT
+    - XRPUSDT
+    - ADAUSDT
+    - DOGEUSDT
+    - TRXUSDT
+    - AVAXUSDT
+    - LINKUSDT
+    - DOTUSDT
+    - POLUSDT
+    - SHIBUSDT
+    - LTCUSDT
+    - BCHUSDT
+    - UNIUSDT
+    - ATOMUSDT
+    - XLMUSDT
+    - NEARUSDT
+    - ICPUSDT
   monitor_interval_seconds: 300
