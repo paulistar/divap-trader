@@ -22,6 +22,7 @@ from src.core.exceptions import AnalysisError, ExchangeError
 from src.data.repositories.alert_repo import AlertRepository
 from src.data.repositories.candle_repo import CandleRepository
 from src.data.sources.binance import BinanceSource
+from src.detection.divap_scanner import DIVAPScanner
 from src.markets.instruments import instrument_from_symbol
 
 logger = logging.getLogger(__name__)
