@@ -38,6 +38,7 @@ class ProfileExecution:
     max_open_trades: int
     allowed_timeframes: tuple[str, ...]
     allocation_multiplier: Decimal
+    min_risk_reward_by_timeframe: dict[str, Decimal] | None = None
 
 
 @dataclass(frozen=True, slots=True)

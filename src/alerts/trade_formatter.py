@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from src.detection.divap_scanner import DIVAPSignal
 from src.execution.trade_executor import TradeExecutionResult
 
 
@@ -7,6 +8,34 @@ def _fmt(value: Decimal | None) -> str:
     if value is None:
         return "N/A"
     return f"{value:.2f}"
+
+
+def format_trade_opened(
+    signal: DIVAPSignal,
+    result: TradeExecutionResult,
+    *,
+    profile_name: str,
+) -> str:
+    """Telegram quando uma ordem é efetivamente aberta (testnet/live/dry-run)."""
+    direction = "COMPRA" if result.direction == "buy" else "VENDA"
+    confidence = "ALTA" if signal.confidence == "high" else "MÉDIA"
+    dry = result.reason == "dry_run"
+    mode = " (simulado)" if dry else ""
+
+    message = (
+        f"✅ <b>Trade aberto{mode} — {result.symbol}</b>\n"
+        f"Perfil: {profile_name}\n"
+        f"{direction} · {signal.timeframe} · Confiança {confidence}\n"
+    )
+    if result.entry_price:
+        message += (
+            f"Entrada: {_fmt(result.entry_price)}\n"
+            f"Quantidade: {_fmt(result.quantity)}\n"
+            f"Valor: {_fmt(result.quote_amount)} USDT"
+        )
+    if result.trade_id:
+        message += f"\nTrade ID: #{result.trade_id}"
+    return message
 
 
 def format_trade_execution(result: TradeExecutionResult) -> str:

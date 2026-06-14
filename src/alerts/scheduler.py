@@ -2,10 +2,9 @@
 
 import logging
 
-from src.alerts.formatter import format_divap_alert
+from src.alerts.trade_formatter import format_trade_opened
 from src.alerts.telegram import TelegramNotifier
-from src.alerts.trade_formatter import format_trade_execution
-from src.api.push_service import notify_high_confidence_signal
+from src.api.push_service import notify_trade_opened
 from src.bankroll.execution_context import get_active_execution_profile
 from src.execution.gate import should_execute_trade
 from src.execution.trade_executor import TradeExecutor
@@ -95,14 +94,6 @@ def run_divap_scan(
             signals_found.append(key)
             logger.info("DIVAP signal detected: %s (alert #%s)", key, alert_id)
 
-            if signal.confidence == "high":
-                notify_high_confidence_signal(
-                    symbol=signal.symbol,
-                    timeframe=signal.timeframe,
-                    direction=signal.direction,
-                    alert_id=alert_id,
-                )
-
             analysis_text: str | None = None
             if use_llm and settings.openai_api_key:
                 try:
@@ -111,19 +102,28 @@ def run_divap_scan(
                 except AnalysisError as exc:
                     logger.warning("LLM analysis skipped for %s: %s", key, exc)
 
-            if notify and notifier.is_configured():
-                message = format_divap_alert(signal, analysis_text, market_context)
-                notifier.send(message)
-
             profile, execution, meta = get_active_execution_profile()
             goal_protected = bool(meta.get("protected_mode", False))
+            profile_name = profile.name if profile else meta.get("active_profile_id", "divap")
 
             if settings.trading_enabled:
                 trade_result = executor.try_execute(signal, alert_id, market_context)
                 if trade_result.executed:
                     metrics.trades_executed += 1
                     if notify and notifier.is_configured():
-                        notifier.send(format_trade_execution(trade_result))
+                        notifier.send(
+                            format_trade_opened(
+                                signal,
+                                trade_result,
+                                profile_name=profile_name,
+                            )
+                        )
+                    notify_trade_opened(
+                        symbol=signal.symbol,
+                        timeframe=signal.timeframe,
+                        direction=signal.direction,
+                        trade_id=trade_result.trade_id,
+                    )
                 elif trade_result.reason not in ("trading_disabled",):
                     metrics.record_gate_block(trade_result.reason)
             else:

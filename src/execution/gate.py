@@ -5,6 +5,7 @@ from src.core.config import Settings, settings
 from src.data.models.candle import Candle
 from src.detection.divap_scanner import DIVAPSignal
 from src.execution.risk_manager import risk_reward_ratio
+from src.execution.risk_policy import effective_min_risk_reward
 from src.profiles.exit_policy import resolve_take_profit
 from src.profiles.models import ProfileExecution, TradingProfile
 
@@ -72,7 +73,12 @@ def should_execute_trade(
         return False, "no_targets"
 
     rr = risk_reward_ratio(signal.entry_price, signal.stop_loss, take_profit)
-    if rr < profile_exec.min_risk_reward:
+    min_rr = effective_min_risk_reward(
+        signal.timeframe,
+        profile_exec.min_risk_reward,
+        profile_exec.min_risk_reward_by_timeframe,
+    )
+    if rr < min_rr:
         return False, f"rr_below_minimum_{rr}"
 
     if profile is not None and profile.id == "anti_divap":

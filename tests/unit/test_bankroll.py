@@ -19,6 +19,7 @@ def test_build_profile_performance_includes_all_profiles() -> None:
         perf = build_profile_performance()
     ids = {p["profile_id"] for p in perf}
     assert "divap" in ids
+    assert "divap_ativo" in ids
     assert "scalper" in ids
     assert "position" in ids
     assert "anti_divap" in ids

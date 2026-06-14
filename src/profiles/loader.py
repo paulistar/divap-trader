@@ -15,7 +15,7 @@ from src.profiles.models import (
 )
 
 _PROFILES_DIR = Path(__file__).resolve().parent
-_DEFAULT_ORDER = ("divap", "scalper", "position", "anti_divap")
+_DEFAULT_ORDER = ("divap", "divap_ativo", "scalper", "position", "anti_divap")
 
 
 def _parse_profile(data: dict) -> TradingProfile:
@@ -25,6 +25,10 @@ def _parse_profile(data: dict) -> TradingProfile:
     exit_raw = data.get("exit") or {}
     allowed_tfs = tuple(execution_raw.get("allowed_timeframes", ("4h",)))
     take_profit_fibo = exit_raw.get("take_profit_fibo")
+    rr_by_tf_raw = execution_raw.get("min_risk_reward_by_timeframe") or {}
+    rr_by_tf = (
+        {str(k): Decimal(str(v)) for k, v in rr_by_tf_raw.items()} if rr_by_tf_raw else None
+    )
     return TradingProfile(
         id=data["id"],
         name=data["name"],
@@ -37,6 +41,7 @@ def _parse_profile(data: dict) -> TradingProfile:
             max_open_trades=int(execution_raw.get("max_open_trades", 5)),
             allowed_timeframes=allowed_tfs,
             allocation_multiplier=Decimal(str(execution_raw.get("allocation_multiplier", "1.0"))),
+            min_risk_reward_by_timeframe=rr_by_tf,
         ),
         advisor=ProfileAdvisorRules(
             ideal_fear_greed_min=int(advisor_raw.get("ideal_fear_greed_min", 20)),

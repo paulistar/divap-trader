@@ -29,6 +29,15 @@ def test_divap_scan_top20_crypto() -> None:
     assert profile.execution.min_risk_reward == Decimal("1.5")
 
 
+def test_divap_ativo_accepts_medium_confidence() -> None:
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+    assert profile.execution.min_confidence == "medium"
+    assert profile.execution.max_open_trades == 2
+    assert profile.execution.min_risk_reward_by_timeframe is not None
+    assert profile.execution.min_risk_reward_by_timeframe.get("4h") == Decimal("1.5")
+
+
 def test_position_trader_long_term() -> None:
     profile = load_profile("position")
     assert profile is not None

@@ -113,6 +113,53 @@ def notify_test_push() -> int:
     return sent
 
 
+def notify_trade_opened(
+    *,
+    symbol: str,
+    timeframe: str,
+    direction: str,
+    trade_id: int | None,
+) -> int:
+    """Web push quando um trade é aberto. Returns count sent."""
+    if not vapid_configured():
+        return 0
+
+    try:
+        from pywebpush import WebPushException, webpush
+    except ImportError:
+        logger.warning("pywebpush not installed — push disabled")
+        return 0
+
+    side = "Compra" if direction == "buy" else "Venda"
+    trade_ref = f" #{trade_id}" if trade_id else ""
+    payload = json.dumps(
+        {
+            "title": "DIVAP — trade aberto",
+            "body": f"{symbol} {timeframe} · {side}{trade_ref}",
+            "url": "/dashboard",
+        }
+    )
+    sent = 0
+    for sub in list_subscriptions():
+        endpoint = sub.get("endpoint", "")
+        try:
+            webpush(
+                subscription_info=sub,
+                data=payload,
+                vapid_private_key=settings.vapid_private_key,
+                vapid_claims={"sub": settings.vapid_claims_sub},
+            )
+            sent += 1
+        except WebPushException as exc:
+            status = getattr(exc.response, "status_code", None) if exc.response else None
+            if status in (404, 410):
+                remove_subscription(endpoint)
+            logger.warning("Push failed %s: %s", endpoint[:48], exc)
+        except Exception as exc:
+            logger.warning("Push error: %s", exc)
+    return sent
+
+
 def notify_high_confidence_signal(
     *,
     symbol: str,
