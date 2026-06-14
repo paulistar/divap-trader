@@ -60,6 +60,27 @@ def format_trade_execution(result: TradeExecutionResult) -> str:
     return message
 
 
+def format_trade_partial(
+    trade_id: int,
+    symbol: str,
+    direction: str,
+    target_index: int,
+    target_total: int,
+    exit_price: Decimal,
+    partial_pnl_usdt: Decimal,
+    remaining_quantity: Decimal,
+) -> str:
+    direction_label = "COMPRA" if direction == "buy" else "VENDA"
+    pnl_icon = "🟢" if partial_pnl_usdt >= 0 else "🔴"
+    return (
+        f"{pnl_icon} <b>Alvo {target_index}/{target_total} — {symbol}</b>\n"
+        f"ID: #{trade_id} | {direction_label}\n"
+        f"Saída parcial: {_fmt(exit_price)}\n"
+        f"PnL parcial: {_fmt(partial_pnl_usdt)} USDT\n"
+        f"Restante: {_fmt(remaining_quantity)}"
+    )
+
+
 def format_trade_closed(
     trade_id: int,
     symbol: str,

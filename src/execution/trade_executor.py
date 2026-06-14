@@ -14,7 +14,12 @@ from src.bankroll.execution_context import get_active_execution_profile, get_exe
 from src.execution.gate import should_execute_trade
 from src.markets.factory import get_broker, get_data_source
 from src.markets.types import Market, Venue
-from src.profiles.exit_policy import resolve_take_profit
+from src.profiles.exit_policy import (
+    compute_partial_take_profit_levels,
+    resolve_take_profit,
+    uses_partial_take_profits,
+)
+from src.profiles.loader import load_profile
 from src.execution.risk_manager import (
     MIN_ORDER_USDT,
     base_quantity_from_quote,
@@ -232,9 +237,21 @@ class TradeExecutor:
             signal.stop_loss,
             signal.stop_loss * Decimal("0.995"),
         )
-        tp_order = self._broker.place_take_profit_limit(
-            signal.symbol, quantity, take_profit
-        )
+
+        profile = load_profile(profile_id)
+        tp_levels: tuple[Decimal, ...] | None = None
+        tp_order = None
+        if profile is not None and uses_partial_take_profits(profile):
+            tp_levels = compute_partial_take_profit_levels(
+                entry_price,
+                take_profit,
+                signal.direction,
+                profile.exit.partial_take_profits,
+            )
+        else:
+            tp_order = self._broker.place_take_profit_limit(
+                signal.symbol, quantity, take_profit
+            )
 
         trade_id = self._repo.create_trade(
             alert_id=alert_id,
@@ -261,6 +278,8 @@ class TradeExecutor:
             goal_protected=goal_protected,
             market=self._market.value,
             venue=self._venue.value,
+            take_profit_levels=tp_levels,
+            remaining_quantity=quantity if tp_levels else None,
         )
 
         logger.info("Trade #%s opened BUY %s qty=%s", trade_id, signal.symbol, quantity)

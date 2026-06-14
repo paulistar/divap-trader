@@ -127,6 +127,13 @@ class BinanceBroker(ExecutionBroker):
             logger.warning("Take profit order failed for %s: %s", symbol, exc)
             return None
 
+    def cancel_order(self, symbol: str, order_id: str) -> None:
+        ccxt_sym = to_ccxt_symbol(symbol)
+        try:
+            self.exchange.cancel_order(order_id, ccxt_sym)
+        except Exception as exc:
+            logger.warning("Cancel order failed for %s (%s): %s", symbol, order_id, exc)
+
     def fetch_order(self, symbol: str, order_id: str) -> dict:
         ccxt_sym = to_ccxt_symbol(symbol)
         try:

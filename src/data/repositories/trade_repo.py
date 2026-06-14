@@ -1,3 +1,4 @@
+import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,11 +15,13 @@ INSERT INTO trades (
     entry_price, stop_loss, take_profit, quantity, quote_amount,
     context_verdict, context_score, exchange_order_id,
     stop_order_id, tp_order_id, trading_mode, opened_at,
-    profile_id, goal_protected, market, venue
+    profile_id, goal_protected, market, venue,
+    take_profit_levels, remaining_quantity, partials_taken, realized_pnl_usdt
 ) VALUES (
     %s, %s, %s, %s, %s, %s,
     %s, %s, %s, %s, %s,
     %s, %s, %s,
+    %s, %s, %s, %s,
     %s, %s, %s, %s,
     %s, %s, %s, %s
 ) RETURNING id
@@ -53,6 +56,18 @@ RETURNING id
 
 UPDATE_ORDER_IDS_SQL = """
 UPDATE trades SET stop_order_id = %s, tp_order_id = %s WHERE id = %s
+"""
+
+UPDATE_PARTIAL_SQL = """
+UPDATE trades SET
+    remaining_quantity = %s,
+    partials_taken = %s,
+    realized_pnl_usdt = %s
+WHERE id = %s
+"""
+
+UPDATE_STOP_LOSS_SQL = """
+UPDATE trades SET stop_loss = %s, stop_order_id = %s WHERE id = %s
 """
 
 SELECT_TRADES_SQL = """
@@ -153,6 +168,20 @@ class TradeRecord:
     goal_protected: bool = False
     market: str = "crypto"
     venue: str = "binance"
+    take_profit_levels: tuple[Decimal, ...] | None = None
+    remaining_quantity: Decimal | None = None
+    partials_taken: int = 0
+    realized_pnl_usdt: Decimal | None = None
+
+    @property
+    def effective_remaining(self) -> Decimal:
+        if self.remaining_quantity is not None:
+            return self.remaining_quantity
+        return self.quantity or Decimal(0)
+
+    @property
+    def has_partial_exits(self) -> bool:
+        return bool(self.take_profit_levels)
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,7 +244,16 @@ class TradeRepository:
         goal_protected: bool = False,
         market: str = "crypto",
         venue: str = "binance",
+        take_profit_levels: tuple[Decimal, ...] | None = None,
+        remaining_quantity: Decimal | None = None,
+        partials_taken: int = 0,
+        realized_pnl_usdt: Decimal | None = None,
     ) -> int:
+        levels_json = (
+            json.dumps([str(level) for level in take_profit_levels])
+            if take_profit_levels
+            else None
+        )
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -243,6 +281,10 @@ class TradeRepository:
                         goal_protected,
                         market,
                         venue,
+                        levels_json,
+                        remaining_quantity if remaining_quantity is not None else quantity,
+                        partials_taken,
+                        realized_pnl_usdt or Decimal(0),
                     ),
                 )
                 return cur.fetchone()[0]
@@ -333,6 +375,30 @@ class TradeRepository:
             with conn.cursor() as cur:
                 cur.execute(UPDATE_ORDER_IDS_SQL, (stop_order_id, tp_order_id, trade_id))
 
+    def record_partial_close(
+        self,
+        trade_id: int,
+        remaining_quantity: Decimal,
+        partials_taken: int,
+        realized_pnl_usdt: Decimal,
+    ) -> None:
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    UPDATE_PARTIAL_SQL,
+                    (remaining_quantity, partials_taken, realized_pnl_usdt, trade_id),
+                )
+
+    def update_stop_loss(
+        self,
+        trade_id: int,
+        stop_loss: Decimal,
+        stop_order_id: str | None,
+    ) -> None:
+        with self._connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(UPDATE_STOP_LOSS_SQL, (stop_loss, stop_order_id, trade_id))
+
     def get_stats(self) -> TradeStats:
         with self._connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -349,6 +415,12 @@ class TradeRepository:
         )
 
     def _row_to_record(self, row: dict) -> TradeRecord:
+        levels_raw = row.get("take_profit_levels")
+        take_profit_levels: tuple[Decimal, ...] | None = None
+        if levels_raw:
+            parsed = json.loads(levels_raw) if isinstance(levels_raw, str) else levels_raw
+            take_profit_levels = tuple(Decimal(str(price)) for price in parsed)
+
         return TradeRecord(
             id=row["id"],
             alert_id=row["alert_id"],
@@ -377,6 +449,10 @@ class TradeRepository:
             goal_protected=bool(row.get("goal_protected", False)),
             market=row.get("market") or "crypto",
             venue=row.get("venue") or "binance",
+            take_profit_levels=take_profit_levels,
+            remaining_quantity=row.get("remaining_quantity"),
+            partials_taken=int(row.get("partials_taken") or 0),
+            realized_pnl_usdt=row.get("realized_pnl_usdt"),
             opened_at=row["opened_at"],
             closed_at=row["closed_at"],
             created_at=row["created_at"],

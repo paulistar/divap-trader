@@ -5,11 +5,18 @@ from decimal import Decimal
 
 
 @dataclass(frozen=True, slots=True)
+class PartialTakeProfitLevel:
+    distance_pct: int
+
+
+@dataclass(frozen=True, slots=True)
 class ProfileExit:
     take_profit_fibo: Decimal | None
     time_stop_candles: int
     time_stop_min_move_pct: Decimal
     time_stop_timeframes: tuple[str, ...]
+    partial_take_profits: tuple[PartialTakeProfitLevel, ...] = ()
+    move_stop_to_breakeven_after: int = 0
 
 
 @dataclass(frozen=True, slots=True)

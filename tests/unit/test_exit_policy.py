@@ -9,7 +9,9 @@ from src.data.repositories.trade_repo import TradeRecord
 from src.detection.divap_scanner import DIVAPCriteria, DIVAPSignal
 from src.execution.position_monitor import PositionMonitor
 from src.profiles.exit_policy import (
+    compute_partial_take_profit_levels,
     fibo_take_profit_price,
+    partial_close_quantity,
     resolve_take_profit,
     should_time_stop,
 )
@@ -48,6 +50,39 @@ def _signal(targets: tuple[Decimal, ...] = (Decimal("54000"),)) -> DIVAPSignal:
         fibo_level=Decimal("1.0"),
         timestamp=datetime.now(UTC),
     )
+
+
+def test_divap_ativo_has_partial_take_profits() -> None:
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+    assert len(profile.exit.partial_take_profits) == 3
+    assert profile.exit.move_stop_to_breakeven_after == 1
+
+
+def test_compute_partial_take_profit_levels_buy() -> None:
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+    levels = compute_partial_take_profit_levels(
+        Decimal("64040"),
+        Decimal("68000"),
+        "buy",
+        profile.exit.partial_take_profits,
+    )
+    assert len(levels) == 3
+    assert levels[0] == Decimal("64040") + (Decimal("68000") - Decimal("64040")) * Decimal("0.25")
+    assert levels[1] == Decimal("64040") + (Decimal("68000") - Decimal("64040")) * Decimal("0.50")
+    assert levels[2] == Decimal("68000")
+
+
+def test_partial_close_quantity_equal_thirds() -> None:
+    original = Decimal("0.9")
+    remaining = Decimal("0.9")
+    first = partial_close_quantity(original, remaining, 0, 3)
+    assert first == Decimal("0.3")
+    second = partial_close_quantity(original, Decimal("0.6"), 1, 3)
+    assert second == Decimal("0.3")
+    last = partial_close_quantity(original, Decimal("0.3"), 2, 3)
+    assert last == Decimal("0.3")
 
 
 def test_caixa_rapido_exit_rules() -> None:
@@ -179,3 +214,61 @@ def test_position_monitor_applies_time_stop() -> None:
     assert closed is True
     repo.close_trade.assert_called_once()
     assert repo.close_trade.call_args.kwargs["close_reason"] == "time_stop"
+
+
+def test_position_monitor_executes_first_partial() -> None:
+    trade = TradeRecord(
+        id=10,
+        alert_id=1,
+        symbol="BTCUSDT",
+        timeframe="4h",
+        direction="buy",
+        confidence="medium",
+        status="open",
+        entry_price=Decimal("64040"),
+        exit_price=None,
+        stop_loss=Decimal("62000"),
+        take_profit=Decimal("68000"),
+        quantity=Decimal("0.9"),
+        quote_amount=Decimal("57636"),
+        pnl_usdt=None,
+        pnl_pct=None,
+        fees_usdt=None,
+        context_verdict="caution",
+        context_score=50,
+        exchange_order_id="1",
+        stop_order_id="stop-1",
+        tp_order_id=None,
+        close_reason=None,
+        trading_mode="testnet",
+        opened_at=datetime(2026, 6, 14, tzinfo=UTC),
+        closed_at=None,
+        created_at=datetime(2026, 6, 14, tzinfo=UTC),
+        profile_id="divap_ativo",
+        take_profit_levels=(
+            Decimal("65030"),
+            Decimal("66020"),
+            Decimal("68000"),
+        ),
+        remaining_quantity=Decimal("0.9"),
+        partials_taken=0,
+        realized_pnl_usdt=Decimal("0"),
+    )
+    broker = MagicMock()
+    broker.fetch_ticker_price.return_value = Decimal("65100")
+    broker.market_sell.return_value = {"id": "sell-1"}
+    broker.parse_filled.return_value = (Decimal("65100"), Decimal("0.3"), Decimal("19530"))
+    broker.place_stop_loss_limit.return_value = {"id": "stop-2"}
+    broker.cancel_order = MagicMock()
+    repo = MagicMock()
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+
+    monitor = PositionMonitor(broker=broker, trade_repo=repo)
+    with patch("src.execution.position_monitor.load_profile", return_value=profile):
+        closed = monitor._sync_buy_trade_partials(trade)
+
+    assert closed is False
+    broker.market_sell.assert_called_once()
+    repo.record_partial_close.assert_called_once()
+    broker.cancel_order.assert_called_once()

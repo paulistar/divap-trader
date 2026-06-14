@@ -47,3 +47,9 @@ scan:
     - NEARUSDT
     - ICPUSDT
   monitor_interval_seconds: 300
+exit:
+  partial_take_profits:
+    - { distance_pct: 25 }
+    - { distance_pct: 50 }
+    - { distance_pct: 100 }
+  move_stop_to_breakeven_after: 1

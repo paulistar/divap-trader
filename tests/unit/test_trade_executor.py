@@ -109,6 +109,62 @@ def test_executor_dry_run_creates_simulated_trade(
     assert call_kwargs["status"] == "simulated"
 
 
+@patch("src.execution.trade_executor.get_execution_context", return_value=("divap_ativo", False))
+@patch("src.execution.trade_executor.get_active_execution_profile")
+@patch("src.execution.trade_executor.settings")
+@patch.object(TradeExecutor, "_fetch_candles", return_value=[])
+def test_executor_live_buy_with_partial_take_profits(
+    mock_fetch: MagicMock,
+    mock_settings: MagicMock,
+    mock_active_profile: MagicMock,
+    mock_execution_context: MagicMock,
+) -> None:
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+    mock_active_profile.return_value = (
+        profile,
+        profile.execution,
+        {"protected_mode": False, "active_profile_id": "divap_ativo"},
+    )
+    mock_settings.trading_enabled = True
+    mock_settings.trading_mode = "testnet"
+    mock_settings.binance_use_testnet = True
+    mock_settings.trading_min_confidence = "high"
+    mock_settings.trading_block_on_context_reject = True
+    mock_settings.trading_max_open_trades = 5
+    mock_settings.trading_dry_run = False
+
+    broker = MagicMock()
+    broker.get_usdt_balance.return_value = Decimal("10000")
+    broker.min_notional.return_value = Decimal("10")
+    broker.market_buy_quote.return_value = {
+        "id": "order-1",
+        "average": 50000,
+        "filled": 0.024,
+        "cost": 1200,
+    }
+    broker.place_stop_loss_limit.return_value = {"id": "stop-1"}
+    broker.parse_filled.return_value = (
+        Decimal("50000"),
+        Decimal("0.024"),
+        Decimal("1200"),
+    )
+
+    repo = MagicMock()
+    repo.count_open_trades.return_value = 0
+    repo.has_open_trade.return_value = False
+    repo.create_trade.return_value = 99
+
+    executor = TradeExecutor(broker=broker, trade_repo=repo)
+    result = executor.try_execute(_signal(), alert_id=3, market_context=_context())
+
+    assert result.executed is True
+    broker.place_take_profit_limit.assert_not_called()
+    call_kwargs = repo.create_trade.call_args.kwargs
+    assert call_kwargs["take_profit_levels"] is not None
+    assert len(call_kwargs["take_profit_levels"]) == 3
+
+
 @patch("src.execution.trade_executor.get_execution_context", return_value=("divap", False))
 @patch("src.execution.trade_executor.get_active_execution_profile")
 @patch("src.execution.trade_executor.settings")

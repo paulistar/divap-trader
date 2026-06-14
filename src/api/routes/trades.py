@@ -24,6 +24,16 @@ def _trade_to_dict(record) -> dict:
         "exit_price": str(record.exit_price) if record.exit_price else None,
         "stop_loss": str(record.stop_loss) if record.stop_loss else None,
         "take_profit": str(record.take_profit) if record.take_profit else None,
+        "take_profit_levels": [str(level) for level in record.take_profit_levels]
+        if record.take_profit_levels
+        else None,
+        "remaining_quantity": str(record.remaining_quantity)
+        if record.remaining_quantity is not None
+        else None,
+        "partials_taken": record.partials_taken,
+        "realized_pnl_usdt": str(record.realized_pnl_usdt)
+        if record.realized_pnl_usdt is not None
+        else None,
         "quantity": str(record.quantity) if record.quantity else None,
         "quote_amount": str(record.quote_amount) if record.quote_amount else None,
         "pnl_usdt": str(record.pnl_usdt) if record.pnl_usdt is not None else None,

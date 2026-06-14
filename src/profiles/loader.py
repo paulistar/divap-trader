@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from src.profiles.models import (
+    PartialTakeProfitLevel,
     ProfileAdvisorRules,
     ProfileExecution,
     ProfileExit,
@@ -25,6 +26,11 @@ def _parse_profile(data: dict) -> TradingProfile:
     exit_raw = data.get("exit") or {}
     allowed_tfs = tuple(execution_raw.get("allowed_timeframes", ("4h",)))
     take_profit_fibo = exit_raw.get("take_profit_fibo")
+    partial_raw = exit_raw.get("partial_take_profits") or []
+    partial_take_profits = tuple(
+        PartialTakeProfitLevel(distance_pct=int(level["distance_pct"]))
+        for level in partial_raw
+    )
     rr_by_tf_raw = execution_raw.get("min_risk_reward_by_timeframe") or {}
     rr_by_tf = (
         {str(k): Decimal(str(v)) for k, v in rr_by_tf_raw.items()} if rr_by_tf_raw else None
@@ -62,6 +68,10 @@ def _parse_profile(data: dict) -> TradingProfile:
             time_stop_candles=int(exit_raw.get("time_stop_candles", 0)),
             time_stop_min_move_pct=Decimal(str(exit_raw.get("time_stop_min_move_pct", "0"))),
             time_stop_timeframes=tuple(exit_raw.get("time_stop_timeframes", ())),
+            partial_take_profits=partial_take_profits,
+            move_stop_to_breakeven_after=int(
+                exit_raw.get("move_stop_to_breakeven_after", 0)
+            ),
         ),
     )
 

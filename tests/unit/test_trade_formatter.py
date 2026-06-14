@@ -34,3 +34,20 @@ def test_format_trade_closed_profit() -> None:
     assert "ETHUSDT" in message
     assert "120.50" in message
     assert "Alvo atingido" in message
+
+
+def test_format_trade_partial() -> None:
+    from src.alerts.trade_formatter import format_trade_partial
+
+    message = format_trade_partial(
+        trade_id=8,
+        symbol="BTCUSDT",
+        direction="buy",
+        target_index=1,
+        target_total=3,
+        exit_price=Decimal("65030"),
+        partial_pnl_usdt=Decimal("45.20"),
+        remaining_quantity=Decimal("0.02"),
+    )
+    assert "Alvo 1/3" in message
+    assert "45.20" in message

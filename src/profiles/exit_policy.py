@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from datetime import UTC
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 
 from src.data.models.candle import Candle
 from src.data.repositories.trade_repo import TradeRecord
 from src.detection.divap_scanner import DIVAPSignal, Direction
 from src.indicators.fibonacci import calculate_extension_levels, find_swing_points
 from src.profiles.loader import load_profile
-from src.profiles.models import ProfileExit, TradingProfile
+from src.profiles.models import PartialTakeProfitLevel, ProfileExit, TradingProfile
+
+_QTY_PRECISION = Decimal("0.00000001")
 
 
 def fibo_take_profit_price(
@@ -104,6 +106,43 @@ def should_time_stop(
         move_pct = (entry - current) / entry
 
     return move_pct < min_move
+
+
+def uses_partial_take_profits(profile: TradingProfile | None) -> bool:
+    return profile is not None and bool(profile.exit.partial_take_profits)
+
+
+def compute_partial_take_profit_levels(
+    entry: Decimal,
+    final_tp: Decimal,
+    direction: str,
+    levels: tuple[PartialTakeProfitLevel, ...],
+) -> tuple[Decimal, ...]:
+    if direction == "buy":
+        move = final_tp - entry
+    else:
+        move = entry - final_tp
+
+    prices: list[Decimal] = []
+    for level in levels:
+        fraction = Decimal(level.distance_pct) / Decimal(100)
+        if direction == "buy":
+            prices.append(entry + move * fraction)
+        else:
+            prices.append(entry - move * fraction)
+    return tuple(prices)
+
+
+def partial_close_quantity(
+    original_quantity: Decimal,
+    remaining_quantity: Decimal,
+    partials_taken: int,
+    total_partials: int,
+) -> Decimal:
+    if partials_taken >= total_partials - 1:
+        return remaining_quantity
+    third = (original_quantity / Decimal(3)).quantize(_QTY_PRECISION, rounding=ROUND_DOWN)
+    return min(third, remaining_quantity)
 
 
 def exit_rules_for_profile(profile_id: str | None) -> ProfileExit:
