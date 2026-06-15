@@ -252,13 +252,23 @@ class AlertRepository:
         direction: str,
         within_hours: int = 4,
     ) -> bool:
+        return self.find_recent_alert_id(symbol, timeframe, direction, within_hours) is not None
+
+    def find_recent_alert_id(
+        self,
+        symbol: str,
+        timeframe: str,
+        direction: str,
+        within_hours: int = 4,
+    ) -> int | None:
         with self._connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     RECENT_ALERT_SQL,
                     (symbol, timeframe, direction, within_hours),
                 )
-                return cur.fetchone() is not None
+                row = cur.fetchone()
+        return row[0] if row else None
 
     def _row_to_record(self, row: dict) -> AlertRecord:
         return AlertRecord(

@@ -106,6 +106,7 @@ SCHEMA_STATEMENTS: list[str] = [
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS remaining_quantity NUMERIC(30, 8)",
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS partials_taken INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS realized_pnl_usdt NUMERIC(20, 8) DEFAULT 0",
+    "ALTER TABLE bankroll_settings ADD COLUMN IF NOT EXISTS active_profile_ids JSONB",
     "CREATE INDEX IF NOT EXISTS idx_trades_market ON trades (market, status, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_alerts_market ON alerts (market, created_at DESC)",
     """

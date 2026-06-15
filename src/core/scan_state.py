@@ -10,7 +10,8 @@ import redis
 from src.core.beat_state import get_beat_status
 from src.core.config import settings
 from src.core.monitor_state import get_monitor_status
-from src.core.scan_plan import get_active_scan_plan
+from src.core.scan_plan import get_active_scan_plans
+from src.data.repositories.bankroll_repo import BankrollRepository
 
 BEAT_TICK_SECONDS = 300
 LAST_SCAN_KEY = "divap:last_scan_at"
@@ -60,36 +61,64 @@ def get_last_scan_at(profile_id: str) -> datetime | None:
 
 def get_scan_status() -> dict:
     client = _client()
-    plan = get_active_scan_plan()
-    raw = client.get(_profile_scan_key(plan.profile_id)) or client.get(LAST_SCAN_KEY)
-    result_raw = client.get(LAST_SCAN_RESULT_KEY)
-    last_at: datetime | None = None
-    if raw:
-        last_at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-        if last_at.tzinfo is None:
-            last_at = last_at.replace(tzinfo=UTC)
+    plans = get_active_scan_plans()
+    settings_row = BankrollRepository().get_settings()
+    active_ids = list(settings_row.active_profile_ids)
+    active_names = [plan.profile_name for plan in plans]
 
+    last_at: datetime | None = None
+    for plan in plans:
+        raw = client.get(_profile_scan_key(plan.profile_id))
+        if not raw:
+            continue
+        candidate = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if candidate.tzinfo is None:
+            candidate = candidate.replace(tzinfo=UTC)
+        if last_at is None or candidate > last_at:
+            last_at = candidate
+
+    if last_at is None:
+        raw = client.get(LAST_SCAN_KEY)
+        if raw:
+            last_at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if last_at.tzinfo is None:
+                last_at = last_at.replace(tzinfo=UTC)
+
+    result_raw = client.get(LAST_SCAN_RESULT_KEY)
     now = datetime.now(UTC)
     seconds_since: int | None = None
     seconds_until: int | None = None
-    interval = plan.interval_seconds
+    min_interval = min(plan.interval_seconds for plan in plans) if plans else 900
     if last_at:
         elapsed = int((now - last_at).total_seconds())
         seconds_since = max(0, elapsed)
-        seconds_until = max(0, interval - elapsed)
+        seconds_until = max(0, min_interval - elapsed)
 
     last_result = json.loads(result_raw) if result_raw else {}
+    primary = plans[0] if plans else None
+
+    all_symbols: list[str] = []
+    all_tfs: list[str] = []
+    for plan in plans:
+        for symbol in plan.symbols:
+            if symbol not in all_symbols:
+                all_symbols.append(symbol)
+        for tf in plan.timeframes:
+            if tf not in all_tfs:
+                all_tfs.append(tf)
 
     return {
         "last_scan_at": last_at.isoformat() if last_at else None,
         "seconds_since_last": seconds_since,
         "seconds_until_next": seconds_until,
-        "interval_seconds": interval,
+        "interval_seconds": min_interval,
         "beat_tick_seconds": BEAT_TICK_SECONDS,
-        "active_profile_id": plan.profile_id,
-        "active_profile_name": plan.profile_name,
-        "scan_timeframes": list(plan.timeframes),
-        "scan_symbols": list(plan.symbols),
+        "active_profile_id": primary.profile_id if primary else active_ids[0],
+        "active_profile_name": primary.profile_name if primary else "—",
+        "active_profile_ids": active_ids,
+        "active_profile_names": active_names,
+        "scan_timeframes": all_tfs,
+        "scan_symbols": all_symbols,
         "last_signals": last_result.get("signals", 0),
         "last_errors": last_result.get("errors", 0),
         "last_skipped": last_result.get("skipped", False),

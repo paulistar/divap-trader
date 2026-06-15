@@ -10,7 +10,7 @@
   <link rel="manifest" href="/dashboard/static/manifest.webmanifest" />
   <link rel="icon" href="/dashboard/static/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/dashboard/static/icon.svg" />
-  <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=5" />
+  <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=6" />
 </head>
 <body>
   <div id="login-view" class="wrap">
@@ -50,6 +50,7 @@
       <a href="#scan-summary-section">Scan</a>
       <a href="#bankroll-section">Banca</a>
       <a href="#profiles-section">Perfis</a>
+      <a href="#trades-section">Trades</a>
       <a href="#alerts-section">Alertas</a>
     </nav>
 
@@ -90,10 +91,8 @@
       <h2>Gestão da banca</h2>
       <div class="bankroll-panel card" id="bankroll-panel">
         <div class="bankroll-form">
-          <label>Perfil ativo (execução)
-            <select id="active-profile-select">
-              <option value="divap">DIVAP</option>
-            </select>
+          <label>Perfis ativos (execução simultânea)
+            <div id="active-profiles-list" class="profile-checkboxes"></div>
           </label>
           <label>Meta mensal (USDT)
             <input type="number" id="monthly-target-input" min="0" step="10" placeholder="Ex: 500" />
@@ -106,7 +105,7 @@
 
     <section id="profiles-section">
       <h2>Perfis — panorama do momento</h2>
-      <p class="subtitle section-hint">Todos os perfis avaliados. Só o perfil ativo executa trades.</p>
+      <p class="subtitle section-hint">Todos os perfis avaliados. Os perfis marcados em banca escaneiam e executam de forma independente.</p>
       <div class="profiles-grid" id="profiles-grid"></div>
     </section>
 
@@ -120,6 +119,45 @@
       <div id="profile-performance-grid" class="profiles-grid"></div>
       <div id="profile-history-tabs" class="profile-history-tabs"></div>
     </details>
+
+    <section id="open-trades-section" class="section-open hidden">
+      <h2>Trades abertos</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Par</th><th>TF</th><th>Perfil</th><th>Lado</th><th>Status</th>
+              <th>Entrada</th><th>Atual</th><th>Saída</th><th>25%</th><th>50%</th><th>100%</th>
+              <th>PnL</th><th>Modo</th><th>Quando</th>
+            </tr>
+          </thead>
+          <tbody id="open-trades-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="pnl-chart-section" class="hidden">
+      <h2>PnL acumulado</h2>
+      <div class="chart-wrap">
+        <canvas id="pnl-chart"></canvas>
+      </div>
+    </section>
+
+    <section id="trades-section">
+      <h2>Histórico de trades</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Par</th><th>TF</th><th>Perfil</th><th>Lado</th><th>Status</th>
+              <th>Entrada</th><th>Atual</th><th>Saída</th><th>25%</th><th>50%</th><th>100%</th>
+              <th>PnL</th><th>Modo</th><th>Quando</th>
+            </tr>
+          </thead>
+          <tbody id="trades-body"></tbody>
+        </table>
+      </div>
+    </section>
 
     <section id="alerts-section">
       <h2>Alertas DIVAP</h2>
@@ -185,43 +223,6 @@
       </div>
     </section>
 
-    <section id="open-trades-section" class="section-open hidden">
-      <h2>Trades abertos</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th><th>Par</th><th>TF</th><th>Perfil</th><th>Lado</th><th>Status</th>
-              <th>Entrada</th><th>PnL</th><th>Modo</th><th>Quando</th>
-            </tr>
-          </thead>
-          <tbody id="open-trades-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section id="pnl-chart-section" class="hidden">
-      <h2>PnL acumulado</h2>
-      <div class="chart-wrap">
-        <canvas id="pnl-chart"></canvas>
-      </div>
-    </section>
-
-    <section>
-      <h2>Histórico de trades</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th><th>Par</th><th>TF</th><th>Perfil</th><th>Lado</th><th>Status</th>
-              <th>Entrada</th><th>PnL</th><th>Modo</th><th>Quando</th>
-            </tr>
-          </thead>
-          <tbody id="trades-body"></tbody>
-        </table>
-      </div>
-    </section>
-
     <footer>
       <span id="footer-updated">—</span>
       <span id="scan-status">—</span>
@@ -230,6 +231,6 @@
   </div>
 
   <div id="modal-root"></div>
-  <script src="/dashboard/static/dashboard.js?v=7" defer></script>
+  <script src="/dashboard/static/dashboard.js?v=8" defer></script>
 </body>
 </html>

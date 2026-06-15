@@ -10,10 +10,15 @@ from src.data.repositories.trade_repo import TradeRepository
 from src.data.sources.interfaces import MarketDataSource
 from src.detection.divap_scanner import DIVAPSignal
 from src.execution.interfaces import ExecutionBroker
-from src.bankroll.execution_context import get_active_execution_profile, get_execution_context
+from src.bankroll.execution_context import (
+    get_active_execution_profile,
+    get_execution_context,
+    get_execution_profile_for,
+)
 from src.execution.gate import should_execute_trade
 from src.markets.factory import get_broker, get_data_source
 from src.markets.types import Market, Venue
+from src.profiles.models import ProfileExecution
 from src.profiles.exit_policy import (
     compute_partial_take_profit_levels,
     resolve_take_profit,
@@ -60,9 +65,11 @@ class TradeExecutor:
         signal: DIVAPSignal,
         alert_id: int,
         market_context: MarketContext | None,
+        profile_id: str | None = None,
     ) -> TradeExecutionResult:
-        profile, execution, meta = get_active_execution_profile()
-        profile_id, goal_protected = get_execution_context()
+        effective_profile_id = profile_id or get_execution_context()[0]
+        profile, execution, meta = get_execution_profile_for(effective_profile_id)
+        _, goal_protected = get_execution_context(effective_profile_id)
         candles = self._fetch_candles(signal)
         allowed, reason = should_execute_trade(
             signal,
@@ -85,7 +92,7 @@ class TradeExecutor:
                 direction=signal.direction,
             )
 
-        if self._repo.count_open_trades() >= execution.max_open_trades:
+        if self._repo.count_open_trades(effective_profile_id) >= execution.max_open_trades:
             return TradeExecutionResult(
                 trade_id=None,
                 executed=False,
@@ -94,7 +101,7 @@ class TradeExecutor:
                 direction=signal.direction,
             )
 
-        if self._repo.has_open_trade(signal.symbol, signal.timeframe):
+        if self._repo.has_open_trade(signal.symbol, signal.timeframe, effective_profile_id):
             return TradeExecutionResult(
                 trade_id=None,
                 executed=False,
@@ -118,7 +125,7 @@ class TradeExecutor:
             )
 
         if settings.trading_dry_run:
-            quote = self._resolve_quote_amount(signal)
+            quote = self._resolve_quote_amount(signal, execution)
             trade_id = self._repo.create_trade(
                 alert_id=alert_id,
                 symbol=signal.symbol,
@@ -140,7 +147,7 @@ class TradeExecutor:
                 tp_order_id=None,
                 trading_mode=settings.trading_mode,
                 opened_at=datetime.now(UTC),
-                profile_id=profile_id,
+                profile_id=effective_profile_id,
                 goal_protected=goal_protected,
                 market=self._market.value,
                 venue=self._venue.value,
@@ -158,7 +165,13 @@ class TradeExecutor:
 
         try:
             return self._execute_live(
-                signal, alert_id, market_context, take_profit, profile_id, goal_protected
+                signal,
+                alert_id,
+                market_context,
+                take_profit,
+                effective_profile_id,
+                goal_protected,
+                execution,
             )
         except ExchangeError as exc:
             logger.error("Trade execution failed %s: %s", signal.symbol, exc)
@@ -173,8 +186,11 @@ class TradeExecutor:
     def _fetch_candles(self, signal: DIVAPSignal):
         return self._source.fetch_ohlcv(signal.symbol, signal.timeframe, limit=100)
 
-    def _resolve_quote_amount(self, signal: DIVAPSignal) -> Decimal:
-        _, execution, _ = get_active_execution_profile()
+    def _resolve_quote_amount(
+        self, signal: DIVAPSignal, execution: ProfileExecution | None = None
+    ) -> Decimal:
+        if execution is None:
+            _, execution, _ = get_active_execution_profile()
         usdt = self._broker.get_usdt_balance()
         quote = calculate_quote_amount(usdt, signal.timeframe, signal.confidence)
         quote = (quote * execution.allocation_multiplier).quantize(Decimal("0.01"))
@@ -189,13 +205,26 @@ class TradeExecutor:
         take_profit: Decimal,
         profile_id: str,
         goal_protected: bool,
+        execution: ProfileExecution,
     ) -> TradeExecutionResult:
         if signal.direction == "buy":
             return self._execute_buy(
-                signal, alert_id, market_context, take_profit, profile_id, goal_protected
+                signal,
+                alert_id,
+                market_context,
+                take_profit,
+                profile_id,
+                goal_protected,
+                execution,
             )
         return self._execute_sell(
-            signal, alert_id, market_context, take_profit, profile_id, goal_protected
+            signal,
+            alert_id,
+            market_context,
+            take_profit,
+            profile_id,
+            goal_protected,
+            execution,
         )
 
     def _execute_buy(
@@ -206,9 +235,10 @@ class TradeExecutor:
         take_profit: Decimal,
         profile_id: str,
         goal_protected: bool,
+        execution: ProfileExecution,
     ) -> TradeExecutionResult:
         usdt = self._broker.get_usdt_balance()
-        quote = self._resolve_quote_amount(signal)
+        quote = self._resolve_quote_amount(signal, execution)
         min_notional = max(self._broker.min_notional(signal.symbol), MIN_ORDER_USDT)
 
         if quote < min_notional:
@@ -302,8 +332,9 @@ class TradeExecutor:
         take_profit: Decimal,
         profile_id: str,
         goal_protected: bool,
+        execution: ProfileExecution,
     ) -> TradeExecutionResult:
-        quote_equiv = self._resolve_quote_amount(signal)
+        quote_equiv = self._resolve_quote_amount(signal, execution)
         quantity = base_quantity_from_quote(quote_equiv, signal.entry_price)
         base_balance = self._broker.get_base_balance(signal.symbol)
         quantity = min(quantity, base_balance)

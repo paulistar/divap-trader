@@ -50,8 +50,8 @@ def test_telegram_only_when_trade_executes() -> None:
                 with patch("src.alerts.scheduler.AlertRepository") as alert_cls:
                     alert_cls.return_value.has_recent_alert.return_value = False
                     alert_cls.return_value.save_signal.return_value = 99
-                    with patch("src.alerts.scheduler.collect_market_context", return_value=None):
-                        with patch("src.alerts.scheduler.get_active_execution_profile") as prof:
+                    with patch("src.context.collector.collect_market_context", return_value=None):
+                        with patch("src.alerts.scheduler.get_execution_profile_for") as prof:
                             prof.return_value = (None, MagicMock(), {"active_profile_id": "divap_ativo"})
                             with patch("src.alerts.scheduler.settings") as cfg:
                                 cfg.trading_enabled = True
@@ -64,6 +64,7 @@ def test_telegram_only_when_trade_executes() -> None:
                                                 symbols=("BTCUSDT",),
                                                 timeframes=("1h",),
                                                 notify=True,
+                                                profile_id="divap_ativo",
                                             )
 
     mock_notifier.send.assert_called_once()
@@ -92,8 +93,8 @@ def test_no_telegram_when_trade_blocked() -> None:
                 with patch("src.alerts.scheduler.AlertRepository") as alert_cls:
                     alert_cls.return_value.has_recent_alert.return_value = False
                     alert_cls.return_value.save_signal.return_value = 99
-                    with patch("src.alerts.scheduler.collect_market_context", return_value=None):
-                        with patch("src.alerts.scheduler.get_active_execution_profile") as prof:
+                    with patch("src.context.collector.collect_market_context", return_value=None):
+                        with patch("src.alerts.scheduler.get_execution_profile_for") as prof:
                             prof.return_value = (None, MagicMock(), {})
                             with patch("src.alerts.scheduler.settings") as cfg:
                                 cfg.trading_enabled = True
@@ -105,6 +106,7 @@ def test_no_telegram_when_trade_blocked() -> None:
                                             symbols=("BTCUSDT",),
                                             timeframes=("1h",),
                                             notify=True,
+                                            profile_id="divap_ativo",
                                         )
 
     mock_notifier.send.assert_not_called()

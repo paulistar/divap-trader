@@ -27,6 +27,33 @@ def _resolve_symbols(profile: TradingProfile) -> tuple[str, ...]:
     return DEFAULT_SYMBOLS
 
 
+def get_active_scan_plans() -> tuple[ScanPlan, ...]:
+    repo = BankrollRepository()
+    settings = repo.get_settings()
+    plans: list[ScanPlan] = []
+    seen: set[str] = set()
+    for profile_id in settings.active_profile_ids:
+        if profile_id in seen:
+            continue
+        seen.add(profile_id)
+        profile = load_profile(profile_id)
+        if profile is None:
+            continue
+        plans.append(
+            ScanPlan(
+                profile_id=profile.id,
+                profile_name=profile.name,
+                interval_seconds=profile.scan.interval_seconds,
+                monitor_interval_seconds=profile.scan.monitor_interval_seconds,
+                timeframes=profile.scan.timeframes,
+                symbols=_resolve_symbols(profile),
+            )
+        )
+    if plans:
+        return tuple(plans)
+    return (get_active_scan_plan(),)
+
+
 def get_active_scan_plan() -> ScanPlan:
     repo = BankrollRepository()
     settings = repo.get_settings()

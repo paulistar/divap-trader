@@ -364,6 +364,23 @@ section h2 {
   padding: 0.35rem 0.5rem;
   min-width: 120px;
 }
+.profile-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 220px;
+}
+.profile-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.target-hit {
+  text-align: center;
+  font-size: 1rem;
+}
 .progress-bar {
   height: 8px;
   background: var(--bg-muted);

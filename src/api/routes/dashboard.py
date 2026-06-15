@@ -39,6 +39,9 @@ from src.api.dashboard_service import (
     get_scan_status_payload,
 )
 from src.api.routes.trades import _trade_to_dict
+from src.execution.binance_broker import BinanceBroker
+from src.core.exceptions import ExchangeError
+from src.trading.trade_enrichment import enrich_trade_for_dashboard
 from src.api.schemas import ApiResponse, HealthData
 from src.core.config import settings
 from src.data.repositories.alert_repo import AlertRepository
@@ -57,6 +60,7 @@ class DashboardAuthBody(BaseModel):
 
 class BankrollUpdateBody(BaseModel):
     active_profile_id: str | None = Field(default=None, pattern=r"^[a-z_]+$")
+    active_profile_ids: list[str] | None = None
     monthly_target_usdt: Decimal | None = Field(default=None, ge=0)
 
 
@@ -156,6 +160,25 @@ async def dashboard_logout(response: Response) -> ApiResponse[dict]:
     return ApiResponse(success=True, data={"authenticated": False})
 
 
+def _fetch_live_prices(symbols: set[str]) -> dict:
+    if not symbols:
+        return {}
+    broker = BinanceBroker()
+    prices: dict = {}
+    for symbol in symbols:
+        try:
+            prices[symbol] = broker.fetch_ticker_price(symbol)
+        except ExchangeError:
+            continue
+    return prices
+
+
+def _trade_for_dashboard(record, live_prices: dict) -> dict:
+    payload = _trade_to_dict(record)
+    payload.update(enrich_trade_for_dashboard(record, live_prices))
+    return payload
+
+
 @router.get("/dashboard/data", include_in_schema=False)
 async def dashboard_data(
     _: None = Depends(require_dashboard_session),
@@ -185,6 +208,8 @@ async def dashboard_data(
     open_trades = trade_repo.list_open_trades()
     all_trades = trade_repo.list_trades(limit=limit, offset=0)
     closed_trades = [t for t in all_trades if t.status == "closed"]
+    price_symbols = {t.symbol for t in open_trades} | {t.symbol for t in closed_trades}
+    live_prices = _fetch_live_prices(price_symbols)
 
     return ApiResponse(
         success=True,
@@ -192,8 +217,8 @@ async def dashboard_data(
             "health": HealthData(status="ok", app_env=settings.app_env).model_dump(),
             "stats": _build_stats(),
             "scan": get_scan_status_payload(),
-            "open_trades": [_trade_to_dict(t) for t in open_trades],
-            "trades": [_trade_to_dict(t) for t in closed_trades],
+            "open_trades": [_trade_for_dashboard(t, live_prices) for t in open_trades],
+            "trades": [_trade_for_dashboard(t, live_prices) for t in closed_trades],
             "alerts": [alert_to_dashboard_dict(a) for a in alerts],
             "pnl_series": build_pnl_series(),
         },
@@ -313,12 +338,19 @@ async def dashboard_bankroll_update(
     from src.data.repositories.bankroll_repo import BankrollRepository
     from src.profiles.loader import load_profile
 
-    if body.active_profile_id and load_profile(body.active_profile_id) is None:
+    if body.active_profile_ids is not None:
+        for profile_id in body.active_profile_ids:
+            if load_profile(profile_id) is None:
+                raise HTTPException(status_code=400, detail=f"Perfil inválido: {profile_id}")
+        if not body.active_profile_ids:
+            raise HTTPException(status_code=400, detail="Selecione ao menos um perfil")
+    elif body.active_profile_id and load_profile(body.active_profile_id) is None:
         raise HTTPException(status_code=400, detail="Perfil inválido")
 
     repo = BankrollRepository()
     repo.update_settings(
         active_profile_id=body.active_profile_id,
+        active_profile_ids=body.active_profile_ids,
         monthly_target_usdt=body.monthly_target_usdt,
     )
     return ApiResponse(

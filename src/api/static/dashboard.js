@@ -460,9 +460,9 @@ async function fetchStrategy() {
   return body.data || null;
 }
 
-async function saveBankroll(activeProfileId, monthlyTarget) {
+async function saveBankroll(activeProfileIds, monthlyTarget) {
   const payload = {};
-  if (activeProfileId) payload.active_profile_id = activeProfileId;
+  if (activeProfileIds?.length) payload.active_profile_ids = activeProfileIds;
   if (monthlyTarget !== null && monthlyTarget !== "") payload.monthly_target_usdt = Number(monthlyTarget);
   const res = await fetch("/dashboard/bankroll", {
     method: "POST",
@@ -567,17 +567,18 @@ function renderProfileHistory(data) {
 
 function renderBankroll(bankroll, profilesPayload) {
   const b = bankroll || {};
-  const select = document.getElementById("active-profile-select");
+  const list = document.getElementById("active-profiles-list");
   const targetInput = document.getElementById("monthly-target-input");
   const profileOptions = profilesPayload?.profiles || [];
-  if (select && profileOptions.length) {
-    const activeId = b.active_profile_id || profileOptions[0].id;
-    select.innerHTML = profileOptions
-      .map((p) => `<option value="${p.id}">${p.name}</option>`)
-      .join("");
-    select.value = activeId;
-  } else if (select && b.active_profile_id) {
-    select.value = b.active_profile_id;
+  const activeIds = b.active_profile_ids?.length
+    ? b.active_profile_ids
+    : [b.active_profile_id].filter(Boolean);
+  if (list && profileOptions.length) {
+    list.innerHTML = profileOptions.map((p) => `
+      <label class="profile-checkbox">
+        <input type="checkbox" name="active-profile" value="${p.id}" ${activeIds.includes(p.id) ? "checked" : ""} />
+        <span>${p.name}</span>
+      </label>`).join("");
   }
   if (targetInput && b.monthly_target_usdt != null) targetInput.value = b.monthly_target_usdt;
 
@@ -732,11 +733,17 @@ function renderScan(scan) {
   const interval = s.interval_seconds ? Math.round(s.interval_seconds / 60) : 15;
   const monInterval = s.monitor_interval_seconds ? Math.round(s.monitor_interval_seconds / 60) : 5;
   const monUntil = s.seconds_until_next_monitor != null ? `~${fmtDuration(s.seconds_until_next_monitor)}` : "—";
-  const profile = s.active_profile_name || "—";
+  const profile = s.active_profile_names?.length
+    ? s.active_profile_names.join(", ")
+    : (s.active_profile_name || "—");
   const tfs = (s.scan_timeframes || []).join(", ") || "—";
   const beat = s.beat_active ? "beat OK" : "beat —";
   document.getElementById("scan-status").textContent =
     `Perfil ${profile} · scan ${tfs} a cada ${interval} min (próx. ${until}) · monitor a cada ${monInterval} min (próx. ${monUntil}) · sinais: ${s.last_signals ?? 0} · ${beat}`;
+}
+
+function targetHitCell(hit) {
+  return hit ? "✅" : "—";
 }
 
 function tradeRow(t, clickable = true) {
@@ -744,6 +751,9 @@ function tradeRow(t, clickable = true) {
   const pnlHtml = pnl != null
     ? `<span class="${pnl >= 0 ? "tag-buy" : "tag-sell"}">${fmtNum(pnl)}</span>`
     : "—";
+  const hits = t.target_hits || [false, false, false];
+  const current = t.status === "open" ? fmtNum(t.current_price) : "—";
+  const exitPx = fmtNum(t.exit_display || t.exit_price);
   return `<tr class="${clickable ? "clickable" : ""}" data-trade-id="${t.id}">
     <td>#${t.id}</td>
     <td>${t.symbol}</td>
@@ -752,6 +762,11 @@ function tradeRow(t, clickable = true) {
     <td>${dirLabel(t.direction)}</td>
     <td>${statusLabel(t.status)}</td>
     <td>${fmtNum(t.entry_price)}</td>
+    <td>${current}</td>
+    <td>${exitPx}</td>
+    <td class="target-hit">${targetHitCell(hits[0])}</td>
+    <td class="target-hit">${targetHitCell(hits[1])}</td>
+    <td class="target-hit">${targetHitCell(hits[2])}</td>
     <td>${pnlHtml}</td>
     <td>${t.trading_mode || "—"}</td>
     <td>${fmtDate(t.opened_at || t.created_at)}</td>
@@ -774,7 +789,7 @@ function renderTrades(trades) {
   const rows = trades || [];
   const tbody = document.getElementById("trades-body");
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty">Nenhum trade fechado ainda</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="15" class="empty">Nenhum trade fechado ainda</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((t) => tradeRow(t)).join("");
@@ -1083,8 +1098,11 @@ if (localStorage.getItem("divap-notify-enabled") === "1") {
 }
 document.getElementById("save-bankroll-btn")?.addEventListener("click", async () => {
   try {
+    const checked = [...document.querySelectorAll('input[name="active-profile"]:checked')].map(
+      (el) => el.value,
+    );
     const data = await saveBankroll(
-      document.getElementById("active-profile-select")?.value,
+      checked,
       document.getElementById("monthly-target-input")?.value,
     );
     renderBankroll(data.bankroll, data.profiles);

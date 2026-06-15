@@ -42,17 +42,20 @@ def test_get_scan_status_includes_summary() -> None:
         timeframes=("1h",),
         symbols=("BTCUSDT",),
     )
+    settings = MagicMock(active_profile_ids=("divap",), active_profile_id="divap")
     mock_client.get.side_effect = [
         "2026-06-11T12:00:00+00:00",
         '{"signals": 1, "summary": {"pairs_scanned": 4}}',
         None,
         None,
-        None,
     ]
     with patch("src.core.scan_state._client", return_value=mock_client):
         with patch("src.core.beat_state._client", return_value=mock_client):
-            with patch("src.core.scan_state.get_active_scan_plan", return_value=plan):
-                with patch("src.core.monitor_state.get_active_scan_plan", return_value=plan):
-                    with patch("src.core.monitor_state._client", return_value=mock_client):
-                        status = get_scan_status()
+            with patch("src.core.scan_state.get_active_scan_plans", return_value=(plan,)):
+                with patch("src.core.scan_state.BankrollRepository") as repo_cls:
+                    repo_cls.return_value.get_settings.return_value = settings
+                    with patch("src.core.monitor_state.get_active_scan_plan", return_value=plan):
+                        with patch("src.core.monitor_state._client", return_value=mock_client):
+                            with patch("src.core.scan_state.get_beat_status", return_value={}):
+                                status = get_scan_status()
     assert status["summary"]["pairs_scanned"] == 4

@@ -27,7 +27,7 @@ def assess_profile(
     profile: TradingProfile,
     market: dict,
     *,
-    active_profile_id: str,
+    active_profile_ids: tuple[str, ...] | list[str],
 ) -> ProfileAssessment:
     rules = profile.advisor
     score = 50
@@ -97,15 +97,17 @@ def assess_profile(
         status=status,
         headline=_headline_for_status(profile, status),
         detail=detail,
-        is_active=profile.id == active_profile_id,
+        is_active=profile.id in active_profile_ids,
     )
 
 
-def assess_all_profiles(market: dict, active_profile_id: str) -> list[ProfileSnapshot]:
+def assess_all_profiles(
+    market: dict, active_profile_ids: tuple[str, ...] | list[str]
+) -> list[ProfileSnapshot]:
     from src.profiles.loader import load_all_profiles
 
     snapshots: list[ProfileSnapshot] = []
     for profile in load_all_profiles():
-        assessment = assess_profile(profile, market, active_profile_id=active_profile_id)
+        assessment = assess_profile(profile, market, active_profile_ids=active_profile_ids)
         snapshots.append(ProfileSnapshot(profile=profile, assessment=assessment))
     return snapshots

@@ -11,7 +11,7 @@ def test_assess_profile_returns_status() -> None:
         "avg_context_score": 55,
         "market_cap_change_24h_pct": 1.5,
     }
-    result = assess_profile(profile, market, active_profile_id="divap")
+    result = assess_profile(profile, market, active_profile_ids=["divap"])
     assert result.is_active is True
     assert result.fit_score >= 50
     assert result.status in ("otimo", "bom", "neutro", "ruim")
@@ -27,6 +27,6 @@ def test_caixa_rapido_penalized_low_volatility() -> None:
         "market_cap_change_24h_pct": 0.2,
     }
     high_vol = {**low_vol, "market_cap_change_24h_pct": 3.5}
-    low = assess_profile(profile, low_vol, active_profile_id="divap")
-    high = assess_profile(profile, high_vol, active_profile_id="divap")
+    low = assess_profile(profile, low_vol, active_profile_ids=["divap"])
+    high = assess_profile(profile, high_vol, active_profile_ids=["divap"])
     assert high.fit_score > low.fit_score

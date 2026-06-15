@@ -53,6 +53,7 @@ def build_bankroll_payload() -> dict:
 
     return {
         "active_profile_id": settings.active_profile_id,
+        "active_profile_ids": list(settings.active_profile_ids),
         "monthly_target_usdt": str(target) if target is not None else None,
         "monthly_pnl_usdt": str(monthly_pnl.quantize(Decimal("0.01"))),
         "weekly_pnl_usdt": str(weekly_pnl.quantize(Decimal("0.01"))),
@@ -126,10 +127,11 @@ def build_profiles_payload() -> dict:
     repo = BankrollRepository()
     settings = repo.get_settings()
     market = build_market_overview()
-    snapshots = assess_all_profiles(market, settings.active_profile_id)
+    snapshots = assess_all_profiles(market, settings.active_profile_ids)
     performance = {p["profile_id"]: p for p in build_profile_performance()}
     return {
         "active_profile_id": settings.active_profile_id,
+        "active_profile_ids": list(settings.active_profile_ids),
         "goal_reached": settings.goal_reached_at is not None,
         "performance": list(performance.values()),
         "history": build_profile_history(),
@@ -158,7 +160,7 @@ def build_profile_insights_payload() -> dict[str, str]:
     repo = BankrollRepository()
     settings = repo.get_settings()
     market = build_market_overview()
-    snapshots = assess_all_profiles(market, settings.active_profile_id)
+    snapshots = assess_all_profiles(market, settings.active_profile_ids)
     return generate_profile_insights(
         market,
         snapshots,

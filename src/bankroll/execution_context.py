@@ -7,14 +7,19 @@ from src.profiles.loader import load_profile, protected_execution_profile
 from src.profiles.models import ProfileExecution, TradingProfile
 
 
-def get_active_execution_profile() -> tuple[TradingProfile | None, ProfileExecution, dict]:
+def get_execution_profile_for(
+    profile_id: str,
+) -> tuple[TradingProfile | None, ProfileExecution, dict]:
     repo = BankrollRepository()
     settings = repo.get_settings()
-    profile = load_profile(settings.active_profile_id) or load_profile("divap")
+    profile = load_profile(profile_id) or load_profile("divap")
     meta = {
-        "active_profile_id": settings.active_profile_id,
+        "active_profile_id": profile_id,
+        "active_profile_ids": list(settings.active_profile_ids),
         "goal_reached": settings.goal_reached_at is not None,
-        "goal_reached_at": settings.goal_reached_at.isoformat() if settings.goal_reached_at else None,
+        "goal_reached_at": settings.goal_reached_at.isoformat()
+        if settings.goal_reached_at
+        else None,
     }
     if settings.goal_reached_at is not None:
         if profile is None:
@@ -36,8 +41,15 @@ def get_active_execution_profile() -> tuple[TradingProfile | None, ProfileExecut
     return profile, profile.execution, meta
 
 
-def get_execution_context() -> tuple[str, bool]:
+def get_active_execution_profile() -> tuple[TradingProfile | None, ProfileExecution, dict]:
     repo = BankrollRepository()
     settings = repo.get_settings()
-    _, _, meta = get_active_execution_profile()
-    return settings.active_profile_id, bool(meta.get("protected_mode", False))
+    return get_execution_profile_for(settings.active_profile_id)
+
+
+def get_execution_context(profile_id: str | None = None) -> tuple[str, bool]:
+    repo = BankrollRepository()
+    settings = repo.get_settings()
+    effective = profile_id or settings.active_profile_id
+    _, _, meta = get_execution_profile_for(effective)
+    return effective, bool(meta.get("protected_mode", False))

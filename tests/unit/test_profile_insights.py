@@ -15,7 +15,7 @@ def test_generate_profile_insights_without_api_key() -> None:
     profile = load_profile("divap")
     assert profile is not None
     market = {"fear_greed": 50, "dominant_verdict": "confirm", "avg_context_score": 55}
-    assessment = assess_profile(profile, market, active_profile_id="divap")
+    assessment = assess_profile(profile, market, active_profile_ids=["divap"])
     from src.profiles.models import ProfileSnapshot
 
     snap = ProfileSnapshot(profile=profile, assessment=assessment)
@@ -29,7 +29,7 @@ def test_generate_profile_insights_uses_cache() -> None:
     profile = load_profile("divap")
     assert profile is not None
     market = {"fear_greed": 50, "dominant_verdict": "confirm", "avg_context_score": 55}
-    assessment = assess_profile(profile, market, active_profile_id="divap")
+    assessment = assess_profile(profile, market, active_profile_ids=["divap"])
     from src.profiles.models import ProfileSnapshot
 
     snap = ProfileSnapshot(profile=profile, assessment=assessment)

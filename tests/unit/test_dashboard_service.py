@@ -42,25 +42,27 @@ def test_record_and_get_scan_status() -> None:
         timeframes=("1h", "4h", "1d"),
         symbols=("BTCUSDT",),
     )
+    settings = MagicMock(active_profile_ids=("divap",), active_profile_id="divap")
     with patch("src.core.scan_state._client", return_value=mock_client):
-        with patch("src.core.scan_state.get_active_scan_plan", return_value=plan):
-            record_scan("divap", {"signals": 2, "errors": 0, "details": ["BTCUSDT:4h"]})
-            assert mock_client.set.call_count == 4
+        record_scan("divap", {"signals": 2, "errors": 0, "details": ["BTCUSDT:4h"]})
+        assert mock_client.set.call_count == 4
 
     mock_client.get.side_effect = [
         "2026-06-11T12:00:00+00:00",
         '{"signals": 2, "errors": 0}',
         None,
         None,
-        None,
     ]
     with patch("src.core.scan_state._client", return_value=mock_client):
         with patch("src.core.beat_state._client", return_value=mock_client):
-            with patch("src.core.scan_state.get_active_scan_plan", return_value=plan):
-                with patch("src.core.monitor_state.get_active_scan_plan", return_value=plan):
-                    with patch("src.core.monitor_state._client", return_value=mock_client):
-                        status = get_scan_status()
-        assert status["last_signals"] == 2
-        assert status["interval_seconds"] == 900
-        assert status["active_profile_id"] == "divap"
-        assert status["monitor_interval_seconds"] == 300
+            with patch("src.core.scan_state.get_active_scan_plans", return_value=(plan,)):
+                with patch("src.core.scan_state.BankrollRepository") as repo_cls:
+                    repo_cls.return_value.get_settings.return_value = settings
+                    with patch("src.core.monitor_state.get_active_scan_plan", return_value=plan):
+                        with patch("src.core.monitor_state._client", return_value=mock_client):
+                            with patch("src.core.scan_state.get_beat_status", return_value={}):
+                                status = get_scan_status()
+    assert status["last_signals"] == 2
+    assert status["interval_seconds"] == 900
+    assert status["active_profile_id"] == "divap"
+    assert status["monitor_interval_seconds"] == 300

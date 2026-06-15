@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -10,10 +11,11 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 UPSERT_BANKROLL_SQL = """
-INSERT INTO bankroll_settings (id, active_profile_id, monthly_target_usdt, period_month)
-VALUES (1, %s, %s, %s)
+INSERT INTO bankroll_settings (id, active_profile_id, active_profile_ids, monthly_target_usdt, period_month)
+VALUES (1, %s, %s, %s, %s)
 ON CONFLICT (id) DO UPDATE SET
     active_profile_id = EXCLUDED.active_profile_id,
+    active_profile_ids = EXCLUDED.active_profile_ids,
     monthly_target_usdt = EXCLUDED.monthly_target_usdt,
     period_month = EXCLUDED.period_month,
     goal_reached_at = CASE
@@ -53,6 +55,7 @@ RETURNING *
 @dataclass(frozen=True, slots=True)
 class BankrollRecord:
     active_profile_id: str
+    active_profile_ids: tuple[str, ...]
     monthly_target_usdt: Decimal | None
     goal_reached_at: datetime | None
     period_month: str
@@ -76,7 +79,7 @@ class BankrollRepository:
                 if row is None:
                     cur.execute(
                         UPSERT_BANKROLL_SQL,
-                        ("divap", None, period),
+                        ("divap_ativo", json.dumps(["divap_ativo"]), None, period),
                     )
                     row = cur.fetchone()
                 elif row["period_month"] != period:
@@ -95,16 +98,22 @@ class BankrollRepository:
     def update_settings(
         self,
         active_profile_id: str | None = None,
+        active_profile_ids: tuple[str, ...] | list[str] | None = None,
         monthly_target_usdt: Decimal | None = None,
     ) -> BankrollRecord:
         current = self.get_settings()
-        profile = active_profile_id or current.active_profile_id
+        if active_profile_ids is not None:
+            profile_ids = tuple(active_profile_ids)
+            primary = profile_ids[0] if profile_ids else current.active_profile_id
+        else:
+            profile_ids = current.active_profile_ids
+            primary = active_profile_id or current.active_profile_id
         target = monthly_target_usdt if monthly_target_usdt is not None else current.monthly_target_usdt
         with self._connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     UPSERT_BANKROLL_SQL,
-                    (profile, target, _current_period_month()),
+                    (primary, json.dumps(list(profile_ids)), target, _current_period_month()),
                 )
                 row = cur.fetchone()
         return self._row_to_record(row)
@@ -132,8 +141,18 @@ class BankrollRepository:
 
     def _row_to_record(self, row: dict) -> BankrollRecord:
         target = row.get("monthly_target_usdt")
+        ids_raw = row.get("active_profile_ids")
+        if ids_raw:
+            parsed = json.loads(ids_raw) if isinstance(ids_raw, str) else ids_raw
+            profile_ids = tuple(str(item) for item in parsed if item)
+        else:
+            profile_ids = (row["active_profile_id"],)
+        if not profile_ids:
+            profile_ids = ("divap",)
+        primary = row["active_profile_id"] or profile_ids[0]
         return BankrollRecord(
-            active_profile_id=row["active_profile_id"],
+            active_profile_id=primary,
+            active_profile_ids=profile_ids,
             monthly_target_usdt=Decimal(str(target)) if target is not None else None,
             goal_reached_at=row.get("goal_reached_at"),
             period_month=row["period_month"],

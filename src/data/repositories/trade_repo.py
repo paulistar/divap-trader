@@ -35,9 +35,14 @@ COUNT_OPEN_TRADES_SQL = """
 SELECT COUNT(*) FROM trades WHERE status = 'open'
 """
 
+COUNT_OPEN_TRADES_BY_PROFILE_SQL = """
+SELECT COUNT(*) FROM trades WHERE status = 'open' AND COALESCE(profile_id, 'divap') = %s
+"""
+
 HAS_OPEN_TRADE_SQL = """
 SELECT id FROM trades
 WHERE status = 'open' AND symbol = %s AND timeframe = %s
+  AND COALESCE(profile_id, 'divap') = %s
 LIMIT 1
 """
 
@@ -289,16 +294,19 @@ class TradeRepository:
                 )
                 return cur.fetchone()[0]
 
-    def count_open_trades(self) -> int:
+    def count_open_trades(self, profile_id: str | None = None) -> int:
         with self._connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(COUNT_OPEN_TRADES_SQL)
+                if profile_id:
+                    cur.execute(COUNT_OPEN_TRADES_BY_PROFILE_SQL, (profile_id,))
+                else:
+                    cur.execute(COUNT_OPEN_TRADES_SQL)
                 return cur.fetchone()[0]
 
-    def has_open_trade(self, symbol: str, timeframe: str) -> bool:
+    def has_open_trade(self, symbol: str, timeframe: str, profile_id: str = "divap") -> bool:
         with self._connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(HAS_OPEN_TRADE_SQL, (symbol, timeframe))
+                cur.execute(HAS_OPEN_TRADE_SQL, (symbol, timeframe, profile_id))
                 return cur.fetchone() is not None
 
     def list_open_trades(self) -> list[TradeRecord]:
