@@ -37,7 +37,7 @@ otc:
   default_stake_usd: 5
   max_open_trades: 3
   expiry_minutes: 1
-  dry_run: true
+  dry_run: false
   martingale:
     enabled: true
     max_protections: 2

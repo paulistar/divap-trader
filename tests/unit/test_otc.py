@@ -36,7 +36,7 @@ def test_otc_config_loaded_from_yaml() -> None:
     assert config.profile_id == "otc"
     assert config.venue == "iqoption"
     assert config.account_mode == "PRACTICE"
-    assert config.dry_run is True
+    assert config.dry_run is False
     assert config.default_stake_usd == Decimal("5")
     assert config.martingale.enabled is True
     assert config.martingale.max_protections == 2
