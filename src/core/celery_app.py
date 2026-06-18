@@ -6,7 +6,7 @@ celery_app = Celery(
     "divap_trader",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["src.alerts.scheduler", "src.execution.tasks"],
+    include=["src.alerts.scheduler", "src.execution.tasks", "src.otc.tasks"],
 )
 
 celery_app.conf.update(

@@ -446,9 +446,12 @@ async def dashboard_otc_signal(
     body: OtcSignalBody,
     _: None = Depends(require_dashboard_session),
 ) -> ApiResponse[dict]:
+    from src.otc.config import load_otc_config
     from src.otc.executor import OtcExecutor
     from src.otc.models import OtcSignal
+    from src.otc.schedule import resolve_leg_datetime, serialize_signal
     from src.otc.signal_parser import parse_telegram_signal
+    from src.otc.tasks import execute_otc_signal, sequence_result_to_dict, should_queue_otc_execution
 
     signal: OtcSignal | None = None
     if body.text:
@@ -469,49 +472,45 @@ async def dashboard_otc_signal(
             detail="Informe `text` (Telegram) ou `asset` + `direction`",
         )
 
+    otc_config = load_otc_config()
+    signal_payload = {
+        "asset": signal.asset,
+        "direction": signal.direction,
+        "expiry_minutes": signal.expiry_minutes,
+        "protection_level": signal.protection_level,
+        "max_auto_protections": signal.max_auto_protections,
+        "entry_time": (
+            signal.entry_time.strftime("%H:%M") if signal.entry_time is not None else None
+        ),
+        "protection_schedule": [
+            item.strftime("%H:%M") for item in signal.protection_schedule
+        ],
+    }
+
+    if should_queue_otc_execution(signal):
+        task = execute_otc_signal.delay(serialize_signal(signal))
+        schedule = {}
+        for level in range(0, (signal.max_auto_protections or otc_config.martingale.max_protections) + 1):
+            target = resolve_leg_datetime(signal, level, otc_config.signal_timezone)
+            if target is not None:
+                schedule[f"leg_{level}"] = target.strftime("%Y-%m-%d %H:%M:%S %Z")
+        return ApiResponse(
+            success=True,
+            data={
+                "queued": True,
+                "task_id": task.id,
+                "signal": signal_payload,
+                "schedule": schedule,
+                "timezone": otc_config.signal_timezone,
+            },
+        )
+
     result = OtcExecutor().try_execute(signal)
-    last_leg = result.legs[-1] if result.legs else None
     return ApiResponse(
         success=True,
         data={
-            "signal": {
-                "asset": signal.asset,
-                "direction": signal.direction,
-                "expiry_minutes": signal.expiry_minutes,
-                "protection_level": signal.protection_level,
-                "max_auto_protections": signal.max_auto_protections,
-            },
-            "result": {
-                "executed": result.executed,
-                "reason": result.reason,
-                "asset": result.asset,
-                "direction": result.direction,
-                "total_pnl_usd": (
-                    str(result.total_pnl_usd) if result.total_pnl_usd is not None else None
-                ),
-                "dry_run": result.dry_run,
-                "legs": [
-                    {
-                        "protection_level": leg.protection_level,
-                        "executed": leg.executed,
-                        "reason": leg.reason,
-                        "trade_id": leg.trade_id,
-                        "order_id": leg.order_id,
-                        "asset": leg.asset,
-                        "stake_usd": str(leg.stake_usd),
-                        "pnl_usd": str(leg.pnl_usd) if leg.pnl_usd is not None else None,
-                        "dry_run": leg.dry_run,
-                    }
-                    for leg in result.legs
-                ],
-                "trade_id": last_leg.trade_id if last_leg else None,
-                "order_id": last_leg.order_id if last_leg else None,
-                "stake_usd": str(last_leg.stake_usd) if last_leg else None,
-                "pnl_usd": (
-                    str(last_leg.pnl_usd)
-                    if last_leg and last_leg.pnl_usd is not None
-                    else None
-                ),
-            },
+            "queued": False,
+            "signal": signal_payload,
+            "result": sequence_result_to_dict(result),
         },
     )

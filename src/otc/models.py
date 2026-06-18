@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 
 
@@ -31,6 +31,8 @@ class OtcProfileConfig:
     assets: tuple[str, ...]
     asset_aliases: dict[str, str]
     telegram: OtcTelegramConfig
+    signal_timezone: str = "America/Sao_Paulo"
+    entry_max_lateness_seconds: int = 45
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +44,7 @@ class OtcSignal:
     raw_text: str = ""
     protection_level: int = 0
     max_auto_protections: int | None = None
+    protection_schedule: tuple[time, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

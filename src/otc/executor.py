@@ -17,6 +17,7 @@ from src.otc.martingale import (
     stake_for_level,
 )
 from src.otc.models import OtcSequenceResult, OtcSignal, OtcTradeResult
+from src.otc.schedule import wait_for_leg
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +96,25 @@ class OtcExecutor:
         return self._sequence_result(signal, tuple(legs), max_protections)
 
     def _execute_leg(self, signal: OtcSignal, level: int) -> OtcTradeResult:
+        if (
+            not self._config.dry_run
+            and (signal.entry_time is not None or signal.protection_schedule)
+        ):
+            ok, skip_reason = wait_for_leg(
+                signal,
+                level,
+                self._config.signal_timezone,
+                max_lateness_seconds=self._config.entry_max_lateness_seconds,
+            )
+            if not ok:
+                return OtcTradeResult(
+                    executed=False,
+                    reason=skip_reason or "scheduled_time_missed",
+                    asset=signal.asset,
+                    direction=signal.direction,
+                    protection_level=level,
+                )
+
         stake = stake_for_level(
             self._config.default_stake_usd,
             self._config.martingale,

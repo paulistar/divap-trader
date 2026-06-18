@@ -55,6 +55,9 @@ def test_parse_max_auto_protections_from_telegram() -> None:
     assert signal.direction == "buy"
     assert signal.protection_level == 0
     assert signal.max_auto_protections == 2
+    assert signal.entry_time is not None
+    assert signal.entry_time.hour == 15
+    assert signal.entry_time.minute == 52
 
 
 def test_martingale_sequence_stops_on_first_win() -> None:

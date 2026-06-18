@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, time
 
 from src.otc.models import OtcSignal
 
@@ -26,6 +26,23 @@ _MANUAL_PROTECTION_LEVEL_RE = re.compile(
     r"(?:^|\n)\s*(?:executar\s+)?prote(?:ç|c)ão\s*(\d+)\s*(?:manual|$)",
     re.IGNORECASE,
 )
+_PROTECTION_LINE_RE = re.compile(r"prote(?:ç|c)[ãa]o", re.IGNORECASE)
+_TIME_IN_LINE_RE = re.compile(r"(\d{1,2}:\d{2})")
+
+
+def _parse_protection_schedule(text: str) -> tuple[time, ...]:
+    times: list[time] = []
+    for line in text.splitlines():
+        if not _PROTECTION_LINE_RE.search(line):
+            continue
+        time_match = _TIME_IN_LINE_RE.search(line)
+        if not time_match:
+            continue
+        try:
+            times.append(datetime.strptime(time_match.group(1), "%H:%M").time())
+        except ValueError:
+            continue
+    return tuple(times)
 
 
 def _normalize_direction(raw: str) -> str:
@@ -80,6 +97,8 @@ def parse_telegram_signal(text: str) -> OtcSignal | None:
     if manual_level_match:
         protection_level = int(manual_level_match.group(1))
 
+    protection_schedule = _parse_protection_schedule(text)
+
     return OtcSignal(
         asset=asset,
         direction=direction,
@@ -88,4 +107,5 @@ def parse_telegram_signal(text: str) -> OtcSignal | None:
         raw_text=text,
         protection_level=protection_level,
         max_auto_protections=max_auto_protections,
+        protection_schedule=protection_schedule,
     )

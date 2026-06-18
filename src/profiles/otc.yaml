@@ -38,6 +38,8 @@ otc:
   max_open_trades: 3
   expiry_minutes: 1
   dry_run: false
+  signal_timezone: America/Sao_Paulo
+  entry_max_lateness_seconds: 45
   martingale:
     enabled: true
     max_protections: 2
@@ -49,6 +51,7 @@ otc:
     - "Litecoin (OTC)"
     - "EUR/USD (OTC)"
     - "EUR/JPY (OTC)"
+    - "EUR/GBP (OTC)"
   asset_aliases:
     XRP/USDT: "Ripple (OTC)"
     XRP/USDT (OTC): "Ripple (OTC)"
@@ -71,6 +74,10 @@ otc:
     EURJPYOTC: "EUR/JPY (OTC)"
     EUR/JPY OTC: "EUR/JPY (OTC)"
     EURJPY: "EUR/JPY (OTC)"
+    EUR/GBP (OTC): "EUR/GBP (OTC)"
+    EURGBPOTC: "EUR/GBP (OTC)"
+    EURGBP: "EUR/GBP (OTC)"
+    EUR/GBP OTC: "EUR/GBP (OTC)"
   telegram:
     enabled: false
     channel: ""
