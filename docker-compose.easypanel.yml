@@ -1,7 +1,8 @@
 # Easypanel — projeto martstudios, serviço compose "divap-trader"
 # Domínio: trade.martstudiosbr.com.br → app:80 (padrão Mart Studios: Traefik :80 → container :80)
 #
-# Variáveis com ${NOME} aparecem no painel Easypanel → Environment.
+# Variáveis com ${NOME} são repassadas quando definidas no textarea Environment do Easypanel.
+# O painel NÃO preenche esse textarea automaticamente — veja deploy/easypanel-iqoption.env.snippet
 x-shared-env: &shared-env
   APP_ENV: production
   APP_DEBUG: "false"

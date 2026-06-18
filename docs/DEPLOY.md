@@ -37,6 +37,10 @@ git push -u origin main
 
 ### 3. Variáveis de ambiente (painel Easypanel)
 
+No serviço **Compose**, o Easypanel usa um **textarea manual** na aba **Environment** — **não** importa variáveis do `docker-compose.easypanel.yml` sozinhas. Você precisa colar/editar lá.
+
+Arquivo pronto para copiar (IQ Option): `deploy/easypanel-iqoption.env.snippet`
+
 ```env
 APP_ENV=production
 APP_DEBUG=false
@@ -48,7 +52,7 @@ TELEGRAM_CHAT_ID=...
 BINANCE_USE_TESTNET=false
 ```
 
-**OTC — IQ Option (perfil `otc`, conta demo):**
+**OTC — IQ Option (cole no final do Environment):**
 
 ```env
 IQOPTION_EMAIL=seu@email.com
@@ -57,7 +61,7 @@ IQOPTION_ACCOUNT_MODE=PRACTICE
 OTC_TRADING_ENABLED=false
 ```
 
-> Essas variáveis aparecem no Easypanel após deploy do `docker-compose.easypanel.yml` atualizado (referência `${IQOPTION_*}` no compose).
+> Ative **Create .env file** (toggle) se ainda não estiver ligado — o compose usa `env_file: .env`.
 
 ### 4. Domínio no Easypanel
 

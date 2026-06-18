@@ -10,12 +10,18 @@ O perfil **OTC** é **isolado do DIVAP**: não participa do scan periódico Bina
 
 ## Variáveis de ambiente
 
+No **Easypanel Compose**, as variáveis ficam no textarea **Environment** do painel — não aparecem sozinhas ao fazer deploy. Copie o bloco de `deploy/easypanel-iqoption.env.snippet` e cole **no final** do Environment:
+
+[Painel Environment — divap-trader](https://painel.martstudiosbr.com.br/projects/martstudios/compose/divap-trader/environment)
+
 ```env
 IQOPTION_EMAIL=seu@email.com
 IQOPTION_PASSWORD=sua_senha
 IQOPTION_ACCOUNT_MODE=PRACTICE
 OTC_TRADING_ENABLED=false
 ```
+
+Salve, ligue **Create .env file** se estiver off, e faça **Deploy**.
 
 | Variável | Descrição |
 |----------|-----------|
