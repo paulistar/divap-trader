@@ -7,12 +7,14 @@ from enum import StrEnum
 class Market(StrEnum):
     CRYPTO = "crypto"
     FOREX = "forex"
+    BINARY_OTC = "binary_otc"
 
 
 class Venue(StrEnum):
     BINANCE = "binance"
     FXCM = "fxcm"
     OANDA = "oanda"
+    IQ_OPTION = "iqoption"
 
 
 @dataclass(frozen=True, slots=True)

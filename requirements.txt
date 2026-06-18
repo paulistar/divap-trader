@@ -15,3 +15,5 @@ httpx>=0.28.0
 python-dotenv>=1.0.1
 pywebpush>=2.0.0
 fxcmpy @ git+https://github.com/chaipat-ncm/fxcmpy.git
+websocket-client==0.56
+iqoptionapi @ git+https://github.com/Lu-Yi-Hsun/iqoptionapi.git

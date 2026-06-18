@@ -48,6 +48,17 @@ TELEGRAM_CHAT_ID=...
 BINANCE_USE_TESTNET=false
 ```
 
+**OTC — IQ Option (perfil `otc`, conta demo):**
+
+```env
+IQOPTION_EMAIL=seu@email.com
+IQOPTION_PASSWORD=sua_senha
+IQOPTION_ACCOUNT_MODE=PRACTICE
+OTC_TRADING_ENABLED=false
+```
+
+> Essas variáveis aparecem no Easypanel após deploy do `docker-compose.easypanel.yml` atualizado (referência `${IQOPTION_*}` no compose).
+
 ### 4. Domínio no Easypanel
 
 | Campo | Valor |

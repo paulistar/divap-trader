@@ -21,6 +21,7 @@ class ProfileExit:
 
 @dataclass(frozen=True, slots=True)
 class ProfileScan:
+    enabled: bool
     interval_seconds: int
     timeframes: tuple[str, ...]
     symbols: tuple[str, ...] | None
@@ -52,6 +53,7 @@ class ProfileExecution:
 class TradingProfile:
     id: str
     name: str
+    kind: str
     tagline: str
     description: str
     execution: ProfileExecution

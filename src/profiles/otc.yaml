@@ -1,0 +1,67 @@
+id: otc
+name: OTC — IQ Option
+kind: otc
+tagline: Opções binárias demo
+description: >
+  Perfil exclusivo para operações OTC via IQ Option (conta demo/prática).
+  Não usa scanner DIVAP — sinais vêm do Telegram ou execução manual.
+  Isolado dos perfis Binance (divap, scalper, etc.).
+execution:
+  min_confidence: medium
+  block_on_reject: false
+  min_risk_reward: "1.0"
+  max_open_trades: 3
+  allowed_timeframes: ["1m"]
+  allocation_multiplier: "1.0"
+advisor:
+  ideal_fear_greed_min: 0
+  ideal_fear_greed_max: 100
+  preferred_verdicts: ["confirm", "caution", "reject"]
+  min_avg_score: 0
+  volatility: high
+  needs_momentum: false
+scan:
+  enabled: false
+  interval_seconds: 0
+  timeframes: ["1m"]
+  symbols: []
+  monitor_interval_seconds: 30
+exit:
+  take_profit_fibo: null
+  time_stop_candles: 0
+  time_stop_min_move_pct: "0"
+  time_stop_timeframes: []
+otc:
+  venue: iqoption
+  account_mode: PRACTICE
+  default_stake_usd: 5
+  max_open_trades: 3
+  expiry_minutes: 1
+  dry_run: true
+  martingale:
+    enabled: true
+    max_protections: 2
+    multiplier: "2.2"
+  assets:
+    - "XRP/USDT (OTC)"
+    - "BTC/USDT (OTC)"
+    - "BNB/USDT (OTC)"
+    - "ADA/USDT (OTC)"
+    - "LTC/USDT (OTC)"
+    - "EUR/USD (OTC)"
+  asset_aliases:
+    XRP/USDT: "XRP/USDT (OTC)"
+    BTC/USDT: "BTC/USDT (OTC)"
+    BNB/USDT: "BNB/USDT (OTC)"
+    ADA/USDT: "ADA/USDT (OTC)"
+    ADAUSDT: "ADA/USDT (OTC)"
+    LTC/USDT: "LTC/USDT (OTC)"
+    LTCUSDT: "LTC/USDT (OTC)"
+    BNBUSDT: "BNB/USDT (OTC)"
+    XRPUSDT: "XRP/USDT (OTC)"
+    BTCUSDT: "BTC/USDT (OTC)"
+    FORDOTC: "Ford (OTC)"
+    FORD: "Ford (OTC)"
+  telegram:
+    enabled: false
+    channel: ""

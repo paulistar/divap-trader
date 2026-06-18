@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     fxcm_server: str = Field(default="demo", alias="FXCM_SERVER")
     fxcm_account_id: str = Field(default="", alias="FXCM_ACCOUNT_ID")
 
+    iqoption_email: str = Field(default="", alias="IQOPTION_EMAIL")
+    iqoption_password: str = Field(default="", alias="IQOPTION_PASSWORD")
+    iqoption_account_mode: str = Field(default="PRACTICE", alias="IQOPTION_ACCOUNT_MODE")
+    otc_trading_enabled: bool = Field(default=False, alias="OTC_TRADING_ENABLED")
+
     @field_validator("vapid_private_key", mode="before")
     @classmethod
     def normalize_vapid_private_key(cls, value: object) -> object:
@@ -71,6 +76,8 @@ class Settings(BaseSettings):
         "binance_api_key",
         "binance_api_secret",
         "fxcm_access_token",
+        "iqoption_email",
+        "iqoption_password",
         mode="before",
     )
     @classmethod

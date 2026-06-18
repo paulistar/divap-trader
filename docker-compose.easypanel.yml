@@ -1,5 +1,42 @@
 # Easypanel — projeto martstudios, serviço compose "divap-trader"
 # Domínio: trade.martstudiosbr.com.br → app:80 (padrão Mart Studios: Traefik :80 → container :80)
+#
+# Variáveis com ${NOME} aparecem no painel Easypanel → Environment.
+x-shared-env: &shared-env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  API_KEY: ${API_KEY:-change-me}
+  DASHBOARD_TOKEN: ${DASHBOARD_TOKEN:-}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  BINANCE_API_KEY: ${BINANCE_API_KEY:-}
+  BINANCE_API_SECRET: ${BINANCE_API_SECRET:-}
+  BINANCE_USE_TESTNET: ${BINANCE_USE_TESTNET:-true}
+  TRADING_ENABLED: ${TRADING_ENABLED:-false}
+  TRADING_MODE: ${TRADING_MODE:-testnet}
+  TRADING_MIN_CONFIDENCE: ${TRADING_MIN_CONFIDENCE:-high}
+  TRADING_BLOCK_ON_CONTEXT_REJECT: ${TRADING_BLOCK_ON_CONTEXT_REJECT:-true}
+  TRADING_MAX_OPEN_TRADES: ${TRADING_MAX_OPEN_TRADES:-5}
+  TRADING_DRY_RUN: ${TRADING_DRY_RUN:-false}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+  OPENAI_MODEL_TRIAGE: ${OPENAI_MODEL_TRIAGE:-gpt-4o-mini}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+  CONTEXT_ENABLED: ${CONTEXT_ENABLED:-true}
+  CONTEXT_NEWS_LIMIT: ${CONTEXT_NEWS_LIMIT:-5}
+  CRYPTOPANIC_API_KEY: ${CRYPTOPANIC_API_KEY:-}
+  VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+  VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+  VAPID_CLAIMS_SUB: ${VAPID_CLAIMS_SUB:-mailto:trade@martstudiosbr.com.br}
+  FXCM_ACCESS_TOKEN: ${FXCM_ACCESS_TOKEN:-}
+  FXCM_SERVER: ${FXCM_SERVER:-demo}
+  FXCM_ACCOUNT_ID: ${FXCM_ACCOUNT_ID:-}
+  # OTC — IQ Option (perfil otc; use PRACTICE = conta demo)
+  IQOPTION_EMAIL: ${IQOPTION_EMAIL:-}
+  IQOPTION_PASSWORD: ${IQOPTION_PASSWORD:-}
+  IQOPTION_ACCOUNT_MODE: ${IQOPTION_ACCOUNT_MODE:-PRACTICE}
+  OTC_TRADING_ENABLED: ${OTC_TRADING_ENABLED:-false}
+
 services:
   app:
     build: .
@@ -7,8 +44,7 @@ services:
     expose:
       - "80"
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
+      <<: *shared-env
       PORT: "80"
       DATABASE_URL: postgresql://divap:${POSTGRES_PASSWORD:-divap}@postgres:5432/divap
       REDIS_URL: redis://redis:6379/0
@@ -25,7 +61,7 @@ services:
     restart: unless-stopped
     command: celery -A src.core.celery_app worker -l info
     environment:
-      APP_ENV: production
+      <<: *shared-env
       DATABASE_URL: postgresql://divap:${POSTGRES_PASSWORD:-divap}@postgres:5432/divap
       REDIS_URL: redis://redis:6379/0
     env_file:
@@ -39,7 +75,7 @@ services:
     restart: unless-stopped
     command: celery -A src.core.celery_app beat -l info
     environment:
-      APP_ENV: production
+      <<: *shared-env
       DATABASE_URL: postgresql://divap:${POSTGRES_PASSWORD:-divap}@postgres:5432/divap
       REDIS_URL: redis://redis:6379/0
     env_file:

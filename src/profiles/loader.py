@@ -38,6 +38,7 @@ def _parse_profile(data: dict) -> TradingProfile:
     return TradingProfile(
         id=data["id"],
         name=data["name"],
+        kind=str(data.get("kind", "divap")),
         tagline=data.get("tagline", ""),
         description=data.get("description", ""),
         execution=ProfileExecution(
@@ -58,6 +59,7 @@ def _parse_profile(data: dict) -> TradingProfile:
             needs_momentum=bool(advisor_raw.get("needs_momentum", False)),
         ),
         scan=ProfileScan(
+            enabled=bool(scan_raw.get("enabled", True)),
             interval_seconds=int(scan_raw.get("interval_seconds", 900)),
             timeframes=tuple(scan_raw.get("timeframes", allowed_tfs)),
             symbols=tuple(scan_raw["symbols"]) if scan_raw.get("symbols") else None,

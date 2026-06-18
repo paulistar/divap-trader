@@ -72,6 +72,14 @@ class PushUnsubscribeBody(BaseModel):
     endpoint: str = Field(min_length=1)
 
 
+class OtcSignalBody(BaseModel):
+    text: str | None = Field(default=None, description="Texto bruto do Telegram")
+    asset: str | None = None
+    direction: str | None = Field(default=None, pattern=r"^(buy|sell)$")
+    expiry_minutes: int | None = Field(default=None, ge=1, le=60)
+    protection_level: int = Field(default=0, ge=0, le=5)
+
+
 async def require_dashboard_session(request: Request) -> None:
     if settings.app_env == "development":
         return
@@ -421,3 +429,63 @@ async def dashboard_trigger_scan(
 ) -> ApiResponse[dict]:
     result = run_profile_scan(notify=True)
     return ApiResponse(success=True, data=result)
+
+
+@router.get("/dashboard/otc/status", include_in_schema=False)
+async def dashboard_otc_status(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    from src.otc.service import build_otc_status
+
+    return ApiResponse(success=True, data=build_otc_status())
+
+
+@router.post("/dashboard/otc/signal", include_in_schema=False)
+async def dashboard_otc_signal(
+    body: OtcSignalBody,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    from src.otc.executor import OtcExecutor
+    from src.otc.models import OtcSignal
+    from src.otc.signal_parser import parse_telegram_signal
+
+    signal: OtcSignal | None = None
+    if body.text:
+        signal = parse_telegram_signal(body.text)
+        if signal is None:
+            raise HTTPException(status_code=400, detail="Não foi possível interpretar o sinal")
+    elif body.asset and body.direction:
+        signal = OtcSignal(
+            asset=body.asset,
+            direction=body.direction,
+            expiry_minutes=body.expiry_minutes or 1,
+            protection_level=body.protection_level,
+        )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe `text` (Telegram) ou `asset` + `direction`",
+        )
+
+    result = OtcExecutor().try_execute(signal)
+    return ApiResponse(
+        success=True,
+        data={
+            "signal": {
+                "asset": signal.asset,
+                "direction": signal.direction,
+                "expiry_minutes": signal.expiry_minutes,
+                "protection_level": signal.protection_level,
+            },
+            "result": {
+                "executed": result.executed,
+                "reason": result.reason,
+                "trade_id": result.trade_id,
+                "order_id": result.order_id,
+                "asset": result.asset,
+                "stake_usd": str(result.stake_usd),
+                "pnl_usd": str(result.pnl_usd) if result.pnl_usd is not None else None,
+                "dry_run": result.dry_run,
+            },
+        },
+    )
