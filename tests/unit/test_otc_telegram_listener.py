@@ -36,6 +36,7 @@ def test_extract_message_from_group() -> None:
 
 def test_chat_id_matches_numeric() -> None:
     assert chat_id_matches("-1001234567890", "-1001234567890")
+    assert chat_id_matches("-1001234567890", "1234567890")
     assert not chat_id_matches("-1001234567890", "-100999")
 
 

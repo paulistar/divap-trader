@@ -58,7 +58,9 @@ async def run_user_listener_async() -> None:
     client = TelegramClient(StringSession(session), api_id, api_hash)
     await client.start()
     entity = await _resolve_telethon_entity(client, source_chat)
-    resolved_chat_id = str(entity.id)
+    from telethon import utils
+
+    resolved_chat_id = str(utils.get_peer_id(entity))
     chat_label = getattr(entity, "title", None) or getattr(entity, "username", source_chat)
     logger.info(
         "OTC Telethon listener ativo — fonte=%s (id=%s) trading=%s dry_run=%s",
