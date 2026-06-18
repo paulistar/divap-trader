@@ -67,6 +67,7 @@ class Settings(BaseSettings):
         alias="IQOPTION_MCP_URL",
     )
     otc_trading_enabled: bool = Field(default=False, alias="OTC_TRADING_ENABLED")
+    otc_telegram_chat_id: str = Field(default="", alias="OTC_TELEGRAM_CHAT_ID")
 
     @field_validator("vapid_private_key", mode="before")
     @classmethod

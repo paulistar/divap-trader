@@ -446,12 +446,9 @@ async def dashboard_otc_signal(
     body: OtcSignalBody,
     _: None = Depends(require_dashboard_session),
 ) -> ApiResponse[dict]:
-    from src.otc.config import load_otc_config
-    from src.otc.executor import OtcExecutor
     from src.otc.models import OtcSignal
-    from src.otc.schedule import leg_window_missed, resolve_leg_datetime, serialize_signal
+    from src.otc.signal_dispatch import dispatch_otc_signal
     from src.otc.signal_parser import parse_telegram_signal
-    from src.otc.tasks import execute_otc_signal, sequence_result_to_dict, should_queue_otc_execution
 
     signal: OtcSignal | None = None
     if body.text:
@@ -472,57 +469,11 @@ async def dashboard_otc_signal(
             detail="Informe `text` (Telegram) ou `asset` + `direction`",
         )
 
-    otc_config = load_otc_config()
-    missed, miss_reason = leg_window_missed(
-        signal,
-        0,
-        otc_config.signal_timezone,
-        max_lateness_seconds=otc_config.entry_max_lateness_seconds,
-    )
-    if missed:
+    outcome = dispatch_otc_signal(signal)
+    if outcome.get("skipped"):
         raise HTTPException(
             status_code=400,
-            detail=f"Horário de entrada já passou ({miss_reason}). Envie o sinal antes do Entrada:.",
+            detail=f"Horário de entrada já passou ({outcome.get('reason')}). Envie o sinal antes do Entrada:.",
         )
 
-    signal_payload = {
-        "asset": signal.asset,
-        "direction": signal.direction,
-        "expiry_minutes": signal.expiry_minutes,
-        "protection_level": signal.protection_level,
-        "max_auto_protections": signal.max_auto_protections,
-        "entry_time": (
-            signal.entry_time.strftime("%H:%M") if signal.entry_time is not None else None
-        ),
-        "protection_schedule": [
-            item.strftime("%H:%M") for item in signal.protection_schedule
-        ],
-    }
-
-    if should_queue_otc_execution(signal):
-        task = execute_otc_signal.delay(serialize_signal(signal))
-        schedule = {}
-        for level in range(0, (signal.max_auto_protections or otc_config.martingale.max_protections) + 1):
-            target = resolve_leg_datetime(signal, level, otc_config.signal_timezone)
-            if target is not None:
-                schedule[f"leg_{level}"] = target.strftime("%Y-%m-%d %H:%M:%S %Z")
-        return ApiResponse(
-            success=True,
-            data={
-                "queued": True,
-                "task_id": task.id,
-                "signal": signal_payload,
-                "schedule": schedule,
-                "timezone": otc_config.signal_timezone,
-            },
-        )
-
-    result = OtcExecutor().try_execute(signal)
-    return ApiResponse(
-        success=True,
-        data={
-            "queued": False,
-            "signal": signal_payload,
-            "result": sequence_result_to_dict(result),
-        },
-    )
+    return ApiResponse(success=True, data=outcome)

@@ -44,6 +44,16 @@ def load_otc_config() -> OtcProfileConfig:
     )
 
 
+def resolve_otc_telegram_chat_id(config: OtcProfileConfig | None = None) -> str:
+    from src.core.config import settings
+
+    cfg = config or load_otc_config()
+    env_chat = settings.otc_telegram_chat_id.strip()
+    if env_chat:
+        return env_chat
+    return cfg.telegram.channel.strip()
+
+
 def resolve_iq_asset(symbol: str, config: OtcProfileConfig | None = None) -> str:
     cfg = config or load_otc_config()
     key = symbol.strip()

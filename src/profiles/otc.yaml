@@ -84,5 +84,5 @@ otc:
     EURAUD: "EUR/AUD (OTC)"
     EUR/AUD OTC: "EUR/AUD (OTC)"
   telegram:
-    enabled: false
+    enabled: true
     channel: ""

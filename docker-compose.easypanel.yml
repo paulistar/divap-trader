@@ -39,6 +39,7 @@ x-shared-env: &shared-env
   IQOPTION_MCP_TOKEN: ${IQOPTION_MCP_TOKEN:-}
   IQOPTION_MCP_URL: ${IQOPTION_MCP_URL:-https://digital-options.mcp.iqoption.com}
   OTC_TRADING_ENABLED: ${OTC_TRADING_ENABLED:-false}
+  OTC_TELEGRAM_CHAT_ID: ${OTC_TELEGRAM_CHAT_ID:-}
 
 services:
   app:
@@ -86,6 +87,20 @@ services:
     depends_on:
       - postgres
       - redis
+
+  otc-telegram:
+    build: .
+    restart: unless-stopped
+    command: python -m src.otc.telegram_listener
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://divap:${POSTGRES_PASSWORD:-divap}@postgres:5432/divap
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - worker
 
   postgres:
     image: timescale/timescaledb:latest-pg15

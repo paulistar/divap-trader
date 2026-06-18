@@ -123,4 +123,17 @@ pip install git+https://github.com/Lu-Yi-Hsun/iqoptionapi.git
 1. Configurar `IQOPTION_MCP_TOKEN` no Easypanel
 2. Validar `scripts/iqoption_test_connection.py`
 3. Testar sinal manual via dashboard (`dry_run: true`)
-4. Listener Telegram (quando `otc.telegram.enabled: true`)
+4. Listener Telegram automático (`otc.telegram.enabled: true` + serviço `otc-telegram`)
+
+### Telegram automático (sinais da sala)
+
+1. Crie um bot com [@BotFather](https://t.me/BotFather) (ou use o `TELEGRAM_BOT_TOKEN` existente).
+2. **Desative privacy mode**: `/setprivacy` → bot → **Disable** (senão o bot não lê todas as mensagens do grupo).
+3. **Adicione o bot ao grupo/canal de sinais** como membro.
+4. Descubra o **chat_id** do grupo (ex.: `-1001234567890`) com [@userinfobot](https://t.me/userinfobot) ou enviando uma mensagem e consultando `getUpdates`.
+5. No Easypanel, configure:
+   - `OTC_TELEGRAM_CHAT_ID=-1001234567890`
+   - `OTC_TRADING_ENABLED=true`
+6. Deploy inclui o serviço **`otc-telegram`**, que faz long-polling e enfileira sinais no Celery no instante em que a mensagem chega.
+
+O listener ignora mensagens que não são sinais (`ENTRADA CONFIRMADA` + ativo + direção) e deduplica por `message_id` no Redis.
