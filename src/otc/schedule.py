@@ -157,6 +157,32 @@ def wait_for_leg(
     return True, None
 
 
+def sleep_until(
+    target: datetime,
+    *,
+    sleep_fn=time.sleep,
+    now_fn=None,
+) -> None:
+    """Espera até `target` com poll fino no final (mesmo padrão de wait_for_leg)."""
+    if now_fn is None:
+        now_fn = lambda: datetime.now(target.tzinfo or UTC)
+
+    now = now_fn()
+    if now >= target:
+        return
+
+    remaining = (target - now).total_seconds()
+    coarse = remaining - COARSE_SLEEP_BUFFER_SECONDS
+    if coarse > 0:
+        sleep_fn(coarse)
+    while now_fn() < target:
+        sleep_fn(FINE_POLL_INTERVAL_SECONDS)
+
+
+def has_scheduled_legs(signal: OtcSignal) -> bool:
+    return signal.entry_time is not None or bool(signal.protection_schedule)
+
+
 def serialize_signal(signal: OtcSignal) -> dict:
     return {
         "asset": signal.asset,

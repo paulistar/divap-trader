@@ -63,6 +63,20 @@ class OtcTradeResult:
 
 
 @dataclass(frozen=True, slots=True)
+class OtcSettlementContext:
+    """Ordem aberta aguardando resultado — usado entre open_binary e wait_settlement."""
+
+    transport: str
+    resolved_asset: str
+    direction: str
+    stake_usd: Decimal
+    duration_minutes: int
+    order_id: str | None = None
+    mcp_asset_id: int | None = None
+    legacy_order_id: object | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class OtcSequenceResult:
     executed: bool
     reason: str

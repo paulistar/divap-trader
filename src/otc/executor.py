@@ -17,7 +17,7 @@ from src.otc.martingale import (
     stake_for_level,
 )
 from src.otc.models import OtcSequenceResult, OtcSignal, OtcTradeResult
-from src.otc.schedule import wait_for_leg
+from src.otc.schedule import has_scheduled_legs, resolve_leg_datetime, wait_for_leg
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class OtcExecutor:
 
         for level in range(start_level, max_protections + 1):
             leg_signal = replace(signal, protection_level=level)
-            leg_result = self._execute_leg(leg_signal, level)
+            leg_result = self._execute_leg(leg_signal, level, max_protections)
             legs.append(leg_result)
 
             if not leg_result.executed:
@@ -95,11 +95,15 @@ class OtcExecutor:
 
         return self._sequence_result(signal, tuple(legs), max_protections)
 
-    def _execute_leg(self, signal: OtcSignal, level: int) -> OtcTradeResult:
-        if (
-            not self._config.dry_run
-            and (signal.entry_time is not None or signal.protection_schedule)
-        ):
+    def _execute_leg(
+        self,
+        signal: OtcSignal,
+        level: int,
+        max_protections: int,
+    ) -> OtcTradeResult:
+        use_schedule = has_scheduled_legs(signal)
+
+        if use_schedule:
             ok, skip_reason = wait_for_leg(
                 signal,
                 level,
@@ -120,6 +124,10 @@ class OtcExecutor:
             self._config.martingale,
             level,
         )
+
+        if use_schedule and not self._config.dry_run:
+            return self._execute_leg_timed(signal, level, max_protections, stake)
+
         result = self._broker.place_binary(signal, stake_usd=stake)
         if not result.executed:
             return replace(result, protection_level=level)
@@ -137,6 +145,47 @@ class OtcExecutor:
             dry_run=result.dry_run,
             protection_level=level,
         )
+
+    def _execute_leg_timed(
+        self,
+        signal: OtcSignal,
+        level: int,
+        max_protections: int,
+        stake: Decimal,
+    ) -> OtcTradeResult:
+        open_result, settlement_ctx = self._broker.open_binary(signal, stake_usd=stake)
+        if not open_result.executed:
+            return replace(open_result, protection_level=level)
+        if settlement_ctx is None:
+            return replace(open_result, protection_level=level)
+
+        has_next = level < max_protections
+        sync_until = None
+        if has_next:
+            sync_until = resolve_leg_datetime(
+                signal,
+                level + 1,
+                self._config.signal_timezone,
+            )
+
+        pnl_usd = self._broker.wait_settlement(
+            settlement_ctx,
+            sync_until=sync_until,
+        )
+        result = OtcTradeResult(
+            executed=True,
+            reason="filled",
+            trade_id=None,
+            order_id=open_result.order_id,
+            asset=open_result.asset,
+            direction=open_result.direction,
+            stake_usd=open_result.stake_usd,
+            pnl_usd=pnl_usd,
+            dry_run=False,
+            protection_level=level,
+        )
+        trade_id = self._persist_trade(signal, result, level)
+        return replace(result, trade_id=trade_id)
 
     def _sequence_result(
         self,
