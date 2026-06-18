@@ -1,12 +1,27 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
+
 from src.core.config import settings
+from src.data.repositories.otc_settings_repo import OtcSettingsRepository
+from src.data.repositories.trade_repo import TradeRepository
 from src.otc.broker import IqOptionBroker
 from src.otc.config import load_otc_config, resolve_otc_telegram_chat_id
+from src.otc.guard import decide_stop
+from src.otc.periods import PERIOD_LABELS, VALID_PERIODS, normalize_period
 from src.otc.telegram_user_listener import user_listener_configured
 from src.otc.iqoption_client import fetch_otc_capabilities, iqoption_configured, otc_transport
 from src.otc.iqoption_client import reset_iqoption_client as reset_connections
 from src.otc.mcp_client import mcp_configured
+
+
+def _to_decimal(value: object) -> Decimal | None:
+    if value is None or value == "":
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
 
 
 def build_otc_status() -> dict:
@@ -62,3 +77,144 @@ def build_otc_status() -> dict:
         "telegram_chat_id": resolve_otc_telegram_chat_id(config) or None,
         "divap_scan": False,
     }
+
+
+_LEVEL_LABELS = {
+    "expiry": "Entrada",
+    "expiry_p1": "1ª proteção",
+    "expiry_p2": "2ª proteção",
+}
+
+
+def _serialize_otc_trade(row: dict) -> dict:
+    close_reason = row.get("close_reason") or ""
+    pnl = row.get("pnl_usdt")
+    result = None
+    if row.get("status") == "closed" and pnl is not None:
+        result = "win" if Decimal(str(pnl)) > 0 else "loss"
+    return {
+        "id": row.get("id"),
+        "asset": row.get("symbol"),
+        "direction": row.get("direction"),
+        "level_label": _LEVEL_LABELS.get(close_reason, "Entrada"),
+        "stake_usd": str(row["quantity"]) if row.get("quantity") is not None else None,
+        "pnl_usd": str(pnl) if pnl is not None else None,
+        "result": result,
+        "status": row.get("status"),
+        "order_id": row.get("exchange_order_id"),
+        "opened_at": row["opened_at"].isoformat() if row.get("opened_at") else None,
+        "closed_at": row["closed_at"].isoformat() if row.get("closed_at") else None,
+    }
+
+
+def _goal_progress(pnl: Decimal | None, goal: Decimal | None) -> dict | None:
+    if goal is None or goal <= 0:
+        return None
+    achieved = pnl or Decimal("0")
+    pct = float((achieved / goal * Decimal("100"))) if goal else 0.0
+    return {
+        "goal_usd": str(goal),
+        "achieved_usd": str(achieved),
+        "progress_pct": round(pct, 2),
+        "reached": achieved >= goal,
+    }
+
+
+def build_otc_overview() -> dict:
+    """Status + banca + estatísticas + metas + travas para a tela IQ Option."""
+    status = build_otc_status()
+    config = load_otc_config()
+    tz = config.signal_timezone
+
+    repo = TradeRepository()
+    settings_repo = OtcSettingsRepository()
+
+    cfg = settings_repo.get_settings()
+    try:
+        stats = repo.otc_stats()
+    except Exception:
+        stats = {}
+    try:
+        period_totals = repo.otc_period_totals(tz)
+    except Exception:
+        period_totals = {}
+    try:
+        trades = [_serialize_otc_trade(t) for t in repo.list_otc_trades(50)]
+    except Exception:
+        trades = []
+
+    balance = _to_decimal(status.get("balance_usd"))
+    initial_bankroll = cfg.initial_bankroll_usd
+    accumulated_pnl = _to_decimal(stats.get("total_pnl_usd")) or Decimal("0")
+
+    profit_abs: Decimal | None = None
+    profit_pct: float | None = None
+    if balance is not None and initial_bankroll is not None and initial_bankroll > 0:
+        profit_abs = balance - initial_bankroll
+        profit_pct = round(float(profit_abs / initial_bankroll * Decimal("100")), 2)
+
+    day_pnl = _to_decimal((period_totals.get("day") or {}).get("pnl_usd")) or Decimal("0")
+    month_pnl = _to_decimal((period_totals.get("month") or {}).get("pnl_usd")) or Decimal("0")
+
+    stop_reason = decide_stop(
+        day_pnl,
+        stop_win_enabled=cfg.stop_win_enabled,
+        stop_loss_enabled=cfg.stop_loss_enabled,
+        daily_goal_usd=cfg.daily_goal_usd,
+        initial_bankroll_usd=cfg.initial_bankroll_usd,
+        daily_stop_loss_pct=cfg.daily_stop_loss_pct,
+    )
+
+    return {
+        **status,
+        "settings": cfg.to_dict(),
+        "stats": stats,
+        "trades": trades,
+        "period_totals": period_totals,
+        "period_labels": PERIOD_LABELS,
+        "bankroll": {
+            "balance_usd": str(balance) if balance is not None else None,
+            "initial_bankroll_usd": str(initial_bankroll) if initial_bankroll is not None else None,
+            "profit_abs_usd": str(profit_abs) if profit_abs is not None else None,
+            "profit_pct": profit_pct,
+            "accumulated_pnl_usd": str(accumulated_pnl),
+        },
+        "goals": {
+            "daily": _goal_progress(day_pnl, cfg.daily_goal_usd),
+            "monthly": _goal_progress(month_pnl, cfg.monthly_goal_usd),
+        },
+        "stop": {
+            "win_enabled": cfg.stop_win_enabled,
+            "loss_enabled": cfg.stop_loss_enabled,
+            "active_reason": stop_reason,
+            "blocked": stop_reason is not None,
+        },
+        "usd_brl_rate": str(cfg.usd_brl_rate) if cfg.usd_brl_rate is not None else None,
+    }
+
+
+def build_otc_pnl(period: str = "day", limit: int = 30) -> dict:
+    period = normalize_period(period)
+    repo = TradeRepository()
+    tz = load_otc_config().signal_timezone
+    try:
+        series = repo.otc_pnl_series(period, limit=limit, timezone=tz)
+    except Exception:
+        series = []
+    total = sum((Decimal(item["pnl_usd"]) for item in series), Decimal("0"))
+    return {
+        "period": period,
+        "label": PERIOD_LABELS.get(period, period),
+        "series": series,
+        "total_usd": str(total),
+        "available_periods": [
+            {"id": p, "label": PERIOD_LABELS[p]} for p in VALID_PERIODS
+        ],
+    }
+
+
+def update_otc_settings(payload: dict) -> dict:
+    """Persiste configurações do painel e devolve o overview atualizado."""
+    repo = OtcSettingsRepository()
+    repo.update_settings(**payload)
+    return build_otc_overview()

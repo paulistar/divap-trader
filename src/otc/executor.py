@@ -6,9 +6,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from src.core.config import settings
+from src.data.repositories.otc_settings_repo import OtcSettingsRepository
 from src.data.repositories.trade_repo import TradeRepository
 from src.otc.broker import IqOptionBroker, MARKET, PROFILE_ID, VENUE
 from src.otc.config import load_otc_config
+from src.otc.guard import evaluate_otc_stop
 from src.otc.martingale import (
     is_loss,
     is_win,
@@ -29,10 +31,12 @@ class OtcExecutor:
         self,
         broker: IqOptionBroker | None = None,
         trade_repo: TradeRepository | None = None,
+        settings_repo: OtcSettingsRepository | None = None,
     ) -> None:
         self._config = load_otc_config()
         self._broker = broker or IqOptionBroker(self._config)
         self._repo = trade_repo or TradeRepository()
+        self._settings_repo = settings_repo or OtcSettingsRepository()
 
     def try_execute(self, signal: OtcSignal) -> OtcSequenceResult:
         if not settings.otc_trading_enabled and not self._config.dry_run:
@@ -42,6 +46,24 @@ class OtcExecutor:
                     OtcTradeResult(
                         executed=False,
                         reason="otc_trading_disabled",
+                        asset=signal.asset,
+                        direction=signal.direction,
+                    ),
+                ),
+            )
+
+        stop_reason = evaluate_otc_stop(
+            trade_repo=self._repo,
+            settings_repo=self._settings_repo,
+            timezone=self._config.signal_timezone,
+        )
+        if stop_reason:
+            return self._sequence_result(
+                signal,
+                (
+                    OtcTradeResult(
+                        executed=False,
+                        reason=stop_reason,
                         asset=signal.asset,
                         direction=signal.direction,
                     ),
@@ -120,7 +142,7 @@ class OtcExecutor:
                 )
 
         stake = stake_for_level(
-            self._config.default_stake_usd,
+            self._effective_base_stake(),
             self._config.martingale,
             level,
         )
@@ -213,6 +235,16 @@ class OtcExecutor:
             total_pnl_usd=total_pnl,
             dry_run=dry_run,
         )
+
+    def _effective_base_stake(self) -> Decimal:
+        """Valor de entrada: override do painel (otc_settings) ou default do YAML."""
+        try:
+            override = self._settings_repo.get_settings().stake_usd
+            if override is not None and override > 0:
+                return override
+        except Exception as exc:  # pragma: no cover - proteção defensiva
+            logger.warning("Falha ao ler stake do painel OTC (usando YAML): %s", exc)
+        return self._config.default_stake_usd
 
     @staticmethod
     def _total_pnl(legs: tuple[OtcTradeResult, ...]) -> Decimal | None:

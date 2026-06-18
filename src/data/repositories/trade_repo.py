@@ -8,6 +8,38 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from src.core.config import settings
+from src.otc.periods import (
+    DEFAULT_TIMEZONE,
+    VALID_PERIODS,
+    bucket_expr,
+    current_period_predicate,
+    normalize_period,
+)
+
+OTC_VENUE = "iqoption"
+
+OTC_STATS_SQL = """
+SELECT
+    COUNT(*) FILTER (WHERE close_reason = 'expiry') AS ops,
+    COUNT(*) FILTER (WHERE close_reason = 'expiry' AND pnl_usdt > 0) AS win_l0,
+    COUNT(*) FILTER (WHERE close_reason = 'expiry_p1') AS prot1,
+    COUNT(*) FILTER (WHERE close_reason = 'expiry_p1' AND pnl_usdt > 0) AS win_p1,
+    COUNT(*) FILTER (WHERE close_reason = 'expiry_p2') AS prot2,
+    COUNT(*) FILTER (WHERE close_reason = 'expiry_p2' AND pnl_usdt > 0) AS win_p2,
+    COUNT(*) FILTER (WHERE status = 'closed') AS legs,
+    COALESCE(SUM(pnl_usdt) FILTER (WHERE status = 'closed'), 0) AS total_pnl
+FROM trades
+WHERE venue = %s
+"""
+
+LIST_OTC_TRADES_SQL = """
+SELECT id, symbol, direction, status, quantity, pnl_usdt, pnl_pct,
+       close_reason, opened_at, closed_at, exchange_order_id, trading_mode
+FROM trades
+WHERE venue = %s
+ORDER BY COALESCE(closed_at, opened_at, created_at) DESC
+LIMIT %s
+"""
 
 INSERT_TRADE_SQL = """
 INSERT INTO trades (
@@ -421,6 +453,99 @@ class TradeRepository:
             avg_pnl_pct=Decimal(str(row["avg_pnl_pct"] or 0)),
             total_fees_usdt=Decimal(str(row["total_fees_usdt"] or 0)),
         )
+
+    def otc_stats(self) -> dict:
+        """Estatísticas agregadas das operações OTC (sequências e proteções)."""
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(OTC_STATS_SQL, (OTC_VENUE,))
+                row = cur.fetchone() or {}
+
+        ops = int(row.get("ops") or 0)
+        win_l0 = int(row.get("win_l0") or 0)
+        prot1 = int(row.get("prot1") or 0)
+        win_p1 = int(row.get("win_p1") or 0)
+        prot2 = int(row.get("prot2") or 0)
+        win_p2 = int(row.get("win_p2") or 0)
+        wins = win_l0 + win_p1 + win_p2
+        losses = max(ops - wins, 0)
+        win_rate = round(wins / ops * 100, 2) if ops else 0.0
+        return {
+            "operations": ops,
+            "wins": wins,
+            "losses": losses,
+            "win_rate_pct": win_rate,
+            "win_no_gale": win_l0,
+            "protection1_count": prot1,
+            "protection1_wins": win_p1,
+            "protection2_count": prot2,
+            "protection2_wins": win_p2,
+            "went_to_gale": prot1,
+            "legs": int(row.get("legs") or 0),
+            "total_pnl_usd": str(Decimal(str(row.get("total_pnl") or 0))),
+        }
+
+    def otc_period_totals(self, timezone: str = DEFAULT_TIMEZONE) -> dict:
+        """PnL e nº de operações do período corrente para cada granularidade."""
+        selects = []
+        for period in VALID_PERIODS:
+            pred = current_period_predicate(period, "closed_at", timezone)
+            selects.append(
+                f"COALESCE(SUM(pnl_usdt) FILTER (WHERE {pred}), 0) AS {period}_pnl"
+            )
+            selects.append(
+                f"COUNT(*) FILTER (WHERE close_reason = 'expiry' AND {pred}) AS {period}_ops"
+            )
+        sql = (
+            "SELECT " + ", ".join(selects) + " FROM trades "
+            "WHERE venue = %s AND status = 'closed' AND closed_at IS NOT NULL"
+        )
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (OTC_VENUE,))
+                row = cur.fetchone() or {}
+        return {
+            period: {
+                "pnl_usd": str(Decimal(str(row.get(f"{period}_pnl") or 0))),
+                "operations": int(row.get(f"{period}_ops") or 0),
+            }
+            for period in VALID_PERIODS
+        }
+
+    def otc_pnl_series(
+        self, period: str = "day", limit: int = 30, timezone: str = DEFAULT_TIMEZONE
+    ) -> list[dict]:
+        """Série de PnL por bucket do período pedido (mais recentes primeiro -> ascendente)."""
+        period = normalize_period(period)
+        bucket = bucket_expr(period, "closed_at", timezone)
+        sql = (
+            f"SELECT {bucket} AS bucket, "
+            "COALESCE(SUM(pnl_usdt), 0) AS pnl, "
+            "COUNT(*) FILTER (WHERE close_reason = 'expiry') AS ops "
+            "FROM trades "
+            "WHERE venue = %s AND status = 'closed' AND closed_at IS NOT NULL "
+            f"GROUP BY {bucket} ORDER BY bucket DESC LIMIT %s"
+        )
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(sql, (OTC_VENUE, limit))
+                rows = cur.fetchall()
+        series = [
+            {
+                "bucket": row["bucket"].isoformat() if row["bucket"] else None,
+                "pnl_usd": str(Decimal(str(row["pnl"] or 0))),
+                "operations": int(row["ops"] or 0),
+            }
+            for row in rows
+        ]
+        series.reverse()
+        return series
+
+    def list_otc_trades(self, limit: int = 50) -> list[dict]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(LIST_OTC_TRADES_SQL, (OTC_VENUE, limit))
+                return list(cur.fetchall())
 
     def _row_to_record(self, row: dict) -> TradeRecord:
         levels_raw = row.get("take_profit_levels")

@@ -81,6 +81,17 @@ class OtcSignalBody(BaseModel):
     max_auto_protections: int | None = Field(default=None, ge=0, le=5)
 
 
+class OtcSettingsBody(BaseModel):
+    stake_usd: Decimal | None = Field(default=None, ge=0)
+    initial_bankroll_usd: Decimal | None = Field(default=None, ge=0)
+    daily_goal_usd: Decimal | None = Field(default=None, ge=0)
+    monthly_goal_usd: Decimal | None = Field(default=None, ge=0)
+    daily_stop_loss_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    stop_win_enabled: bool | None = None
+    stop_loss_enabled: bool | None = None
+    usd_brl_rate: Decimal | None = Field(default=None, ge=0)
+
+
 async def require_dashboard_session(request: Request) -> None:
     if settings.app_env == "development":
         return
@@ -439,6 +450,38 @@ async def dashboard_otc_status(
     from src.otc.service import build_otc_status
 
     return ApiResponse(success=True, data=build_otc_status())
+
+
+@router.get("/dashboard/otc/overview", include_in_schema=False)
+async def dashboard_otc_overview(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    from src.otc.service import build_otc_overview
+
+    return ApiResponse(success=True, data=build_otc_overview())
+
+
+@router.get("/dashboard/otc/pnl", include_in_schema=False)
+async def dashboard_otc_pnl(
+    period: str = "day",
+    limit: int = 30,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    from src.otc.service import build_otc_pnl
+
+    safe_limit = max(1, min(limit, 365))
+    return ApiResponse(success=True, data=build_otc_pnl(period, limit=safe_limit))
+
+
+@router.post("/dashboard/otc/settings", include_in_schema=False)
+async def dashboard_otc_settings(
+    body: OtcSettingsBody,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    from src.otc.service import update_otc_settings
+
+    payload = body.model_dump(exclude_unset=True)
+    return ApiResponse(success=True, data=update_otc_settings(payload))
 
 
 @router.post("/dashboard/otc/signal", include_in_schema=False)

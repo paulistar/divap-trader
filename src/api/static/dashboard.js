@@ -1009,13 +1009,21 @@ async function loadDashboard() {
   }
 }
 
+function refreshTick() {
+  if (getViewMode() === "otc") {
+    loadOtc();
+  } else {
+    loadDashboard();
+  }
+}
+
 function showApp() {
   loginView.classList.add("hidden");
   appView.classList.remove("hidden");
-  loadDashboard();
+  applyView(getViewMode());
   syncPushButtonState();
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(loadDashboard, REFRESH_MS);
+  refreshTimer = setInterval(refreshTick, REFRESH_MS);
 }
 
 function showLogin() {
@@ -1110,6 +1118,416 @@ document.getElementById("save-bankroll-btn")?.addEventListener("click", async ()
   } catch (err) {
     showError(err.message || "Falha ao salvar");
   }
+});
+
+/* ===================== IQ Option (OTC) ===================== */
+let otcOverview = null;
+let otcPnlLoaded = false;
+const DEFAULT_USD_BRL = 5.4;
+
+function getViewMode() {
+  return localStorage.getItem("divap_view") === "otc" ? "otc" : "binance";
+}
+function getOtcCurrency() {
+  return localStorage.getItem("otc_currency") === "brl" ? "brl" : "usd";
+}
+function getOtcPeriod() {
+  return localStorage.getItem("otc_period") || "day";
+}
+function otcRate() {
+  const r = Number(otcOverview?.usd_brl_rate);
+  return Number.isFinite(r) && r > 0 ? r : DEFAULT_USD_BRL;
+}
+
+function otcMoney(usd, { sign = false } = {}) {
+  if (usd == null || usd === "") return "—";
+  let n = Number(usd);
+  if (Number.isNaN(n)) return "—";
+  let symbol = "$";
+  if (getOtcCurrency() === "brl") {
+    n = n * otcRate();
+    symbol = "R$";
+  }
+  const prefix = sign && n > 0 ? "+" : "";
+  return `${prefix}${symbol} ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function signClass(val) {
+  const n = Number(val);
+  if (Number.isNaN(n) || n === 0) return "";
+  return n > 0 ? "positive" : "negative";
+}
+
+function card(label, value, { cls = "", sub = "", highlight = false } = {}) {
+  return `<div class="card${highlight ? " highlight" : ""}">
+    <div class="card-label">${label}</div>
+    <div class="card-value ${cls}">${value}</div>
+    ${sub ? `<div class="card-sub">${sub}</div>` : ""}
+  </div>`;
+}
+
+function applyView(mode) {
+  const view = mode === "otc" ? "otc" : "binance";
+  localStorage.setItem("divap_view", view);
+  document.body.setAttribute("data-view", view);
+  document.querySelectorAll(".view-switch-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === view);
+  });
+  const subtitle = document.getElementById("header-subtitle");
+  if (subtitle) {
+    subtitle.textContent =
+      view === "otc"
+        ? "IQ Option · binárias OTC via Telegram"
+        : "Demo Binance testnet · scan automático 15 min";
+  }
+  if (view === "otc") {
+    loadOtc();
+  } else {
+    loadDashboard();
+  }
+}
+
+async function fetchOtcOverview() {
+  const res = await fetch("/dashboard/otc/overview", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || body.error || `Erro ${res.status}`);
+  return body.data || {};
+}
+
+async function fetchOtcPnl(period) {
+  const res = await fetch(`/dashboard/otc/pnl?period=${encodeURIComponent(period)}`, {
+    credentials: "same-origin",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || body.error || `Erro ${res.status}`);
+  return body.data || {};
+}
+
+async function loadOtc() {
+  try {
+    otcOverview = await fetchOtcOverview();
+    renderOtc(otcOverview);
+    await loadOtcPnl();
+    document.getElementById("footer-updated").textContent =
+      "Atualizado: " + new Date().toLocaleString("pt-BR");
+  } catch (err) {
+    showError(err.message || "Falha ao carregar IQ Option");
+    if (String(err.message).includes("401")) setTimeout(showLogin, 1200);
+  }
+}
+
+function renderOtc(d) {
+  renderOtcStatusLine(d);
+  renderOtcStopBanner(d);
+  renderOtcBalance(d);
+  renderOtcGoals(d);
+  renderOtcStats(d);
+  renderOtcMartingale(d);
+  renderOtcPeriodTotals(d);
+  renderOtcTrades(d.trades);
+  fillOtcSettingsForm(d.settings);
+}
+
+function renderOtcStatusLine(d) {
+  const el = document.getElementById("otc-status-line");
+  if (!el) return;
+  const conn = d.connection_ok ? "🟢 conectado" : "🔴 sem conexão";
+  const mode = d.account_mode ? d.account_mode.toLowerCase() : "—";
+  const trading = d.otc_trading_enabled ? "trading ON" : "trading OFF";
+  el.textContent = `${conn} · conta ${mode} · ${trading} · stake ${otcMoney(d.settings?.stake_usd || d.default_stake_usd)}`;
+}
+
+function renderOtcStopBanner(d) {
+  const el = document.getElementById("otc-stop-banner");
+  if (!el) return;
+  const reason = d.stop?.active_reason;
+  if (!reason) {
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  if (reason === "stop_win") {
+    el.className = "otc-stop-banner win";
+    el.textContent = "🎯 Stop win atingido — operações pausadas até amanhã. Meta do dia batida!";
+  } else {
+    el.className = "otc-stop-banner loss";
+    el.textContent = "🛑 Stop loss diário atingido — operações pausadas para preservar a banca.";
+  }
+}
+
+function renderOtcBalance(d) {
+  const b = d.bankroll || {};
+  const cards = [
+    card("Saldo atual", otcMoney(b.balance_usd), { highlight: true }),
+    card("Banca inicial", otcMoney(b.initial_bankroll_usd), {
+      sub: b.initial_bankroll_usd ? "" : "defina abaixo",
+    }),
+    card("Lucro / Prejuízo", otcMoney(b.profit_abs_usd, { sign: true }), {
+      cls: signClass(b.profit_abs_usd),
+      sub: b.profit_pct != null ? `${b.profit_pct > 0 ? "+" : ""}${fmtNum(b.profit_pct)}% da banca` : "",
+    }),
+    card("PnL acumulado", otcMoney(b.accumulated_pnl_usd, { sign: true }), {
+      cls: signClass(b.accumulated_pnl_usd),
+      sub: "todas as operações",
+    }),
+  ];
+  document.getElementById("otc-balance-grid").innerHTML = cards.join("");
+}
+
+function goalCard(title, goal) {
+  if (!goal) {
+    return `<div class="otc-goal-card">
+      <div class="otc-goal-top"><span class="otc-goal-title">${title}</span></div>
+      <div class="otc-goal-sub">Defina a meta na gestão de banca abaixo.</div>
+    </div>`;
+  }
+  const pct = Math.max(0, Math.min(100, Number(goal.progress_pct) || 0));
+  return `<div class="otc-goal-card">
+    <div class="otc-goal-top">
+      <span class="otc-goal-title">${title}</span>
+      <span class="otc-goal-value ${signClass(goal.achieved_usd)}">${otcMoney(goal.achieved_usd, { sign: true })}</span>
+    </div>
+    <div class="otc-progress"><div class="otc-progress-bar ${goal.reached ? "reached" : ""}" style="width:${pct}%"></div></div>
+    <div class="otc-goal-sub">${fmtNum(goal.progress_pct)}% de ${otcMoney(goal.goal_usd)} ${goal.reached ? "· ✅ atingida" : ""}</div>
+  </div>`;
+}
+
+function renderOtcGoals(d) {
+  const g = d.goals || {};
+  document.getElementById("otc-goals").innerHTML =
+    goalCard("Meta diária", g.daily) + goalCard("Meta mensal", g.monthly);
+}
+
+function renderOtcStats(d) {
+  const s = d.stats || {};
+  const cards = [
+    card("Operações", s.operations ?? 0),
+    card("Vitórias", s.wins ?? 0, { cls: "positive" }),
+    card("Derrotas", s.losses ?? 0, { cls: "negative" }),
+    card("Taxa de acerto", `${fmtNum(s.win_rate_pct ?? 0)}%`),
+  ];
+  document.getElementById("otc-stats-grid").innerHTML = cards.join("");
+}
+
+function renderOtcMartingale(d) {
+  const s = d.stats || {};
+  const cards = [
+    card("Win sem gale", s.win_no_gale ?? 0, { cls: "positive", sub: "venceu na entrada" }),
+    card("Foram p/ gale", s.went_to_gale ?? 0, { sub: "precisaram proteger" }),
+    card("1ª proteção", `${s.protection1_wins ?? 0}/${s.protection1_count ?? 0}`, {
+      sub: "wins / acionadas",
+    }),
+    card("2ª proteção", `${s.protection2_wins ?? 0}/${s.protection2_count ?? 0}`, {
+      sub: "wins / acionadas",
+    }),
+  ];
+  document.getElementById("otc-martingale-grid").innerHTML = cards.join("");
+}
+
+function renderOtcPeriodTotals(d) {
+  const totals = d.period_totals || {};
+  const labels = d.period_labels || {};
+  const order = ["day", "week", "month", "quarter", "semester", "year"];
+  const cards = order
+    .filter((p) => totals[p])
+    .map((p) =>
+      card(labels[p] || p, otcMoney(totals[p].pnl_usd, { sign: true }), {
+        cls: signClass(totals[p].pnl_usd),
+        sub: `${totals[p].operations} op.`,
+      }),
+    );
+  document.getElementById("otc-period-totals").innerHTML = cards.join("");
+}
+
+function renderOtcTrades(trades) {
+  const body = document.getElementById("otc-trades-body");
+  if (!body) return;
+  if (!trades?.length) {
+    body.innerHTML = `<tr><td colspan="9" class="empty">Nenhuma operação registrada ainda.</td></tr>`;
+    return;
+  }
+  body.innerHTML = trades
+    .map((t) => {
+      const when = fmtDate(t.closed_at || t.opened_at);
+      const resultTag =
+        t.result === "win"
+          ? '<span class="tag-buy">WIN</span>'
+          : t.result === "loss"
+          ? '<span class="tag-sell">LOSS</span>'
+          : statusLabel(t.status);
+      return `<tr>
+        <td>${t.id ?? "—"}</td>
+        <td>${t.asset ?? "—"}</td>
+        <td>${dirLabel(t.direction)}</td>
+        <td>${t.level_label}</td>
+        <td>${otcMoney(t.stake_usd)}</td>
+        <td>${resultTag}</td>
+        <td class="${signClass(t.pnl_usd)}">${otcMoney(t.pnl_usd, { sign: true })}</td>
+        <td>${t.order_id ?? "—"}</td>
+        <td>${when}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function fillOtcSettingsForm(s) {
+  if (!s) return;
+  const setVal = (id, v) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = v != null ? v : "";
+  };
+  const setChk = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!v;
+  };
+  setVal("otc-stake", s.stake_usd);
+  setVal("otc-bankroll", s.initial_bankroll_usd);
+  setVal("otc-daily-goal", s.daily_goal_usd);
+  setVal("otc-monthly-goal", s.monthly_goal_usd);
+  setVal("otc-stop-loss-pct", s.daily_stop_loss_pct);
+  setVal("otc-usd-brl", s.usd_brl_rate);
+  setChk("otc-stop-win-enabled", s.stop_win_enabled);
+  setChk("otc-stop-loss-enabled", s.stop_loss_enabled);
+}
+
+async function loadOtcPnl() {
+  const period = getOtcPeriod();
+  try {
+    const data = await fetchOtcPnl(period);
+    if (!otcPnlLoaded) {
+      const select = document.getElementById("otc-period-select");
+      if (select && data.available_periods) {
+        select.innerHTML = data.available_periods
+          .map((p) => `<option value="${p.id}">${p.label}</option>`)
+          .join("");
+        select.value = period;
+      }
+      otcPnlLoaded = true;
+    }
+    renderOtcPnl(data);
+  } catch (err) {
+    showError(err.message || "Falha ao carregar PnL");
+  }
+}
+
+function renderOtcPnl(data) {
+  const totalEl = document.getElementById("otc-pnl-total");
+  if (totalEl) {
+    totalEl.innerHTML = `Total no período exibido: <strong class="${signClass(data.total_usd)}">${otcMoney(data.total_usd, { sign: true })}</strong>`;
+  }
+  drawOtcChart(document.getElementById("otc-pnl-chart"), data.series || []);
+}
+
+function drawOtcChart(canvas, series) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width || 600;
+  const h = 180;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  if (!series.length) {
+    ctx.fillStyle = "#a3a3a3";
+    ctx.font = "13px Segoe UI, sans-serif";
+    ctx.fillText("Sem dados no período.", 12, h / 2);
+    return;
+  }
+
+  const values = series.map((p) => Number(p.pnl_usd) * (getOtcCurrency() === "brl" ? otcRate() : 1));
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const range = max - min || 1;
+  const pad = 24;
+  const usableH = h - pad * 2;
+  const zeroY = pad + (max / range) * usableH;
+  const n = series.length;
+  const slot = w / n;
+  const barW = Math.max(4, Math.min(40, slot * 0.6));
+
+  ctx.strokeStyle = "#333";
+  ctx.beginPath();
+  ctx.moveTo(0, zeroY);
+  ctx.lineTo(w, zeroY);
+  ctx.stroke();
+
+  series.forEach((p, i) => {
+    const v = values[i];
+    const x = slot * i + (slot - barW) / 2;
+    const barH = (Math.abs(v) / range) * usableH;
+    const y = v >= 0 ? zeroY - barH : zeroY;
+    ctx.fillStyle = v >= 0 ? "#22c55e" : "#ef4444";
+    ctx.fillRect(x, y, barW, barH || 1);
+  });
+}
+
+document.querySelectorAll(".view-switch-btn").forEach((btn) => {
+  btn.addEventListener("click", () => applyView(btn.dataset.view));
+});
+
+document.querySelectorAll(".currency-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    localStorage.setItem("otc_currency", btn.dataset.currency);
+    document.querySelectorAll(".currency-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.currency === btn.dataset.currency);
+    });
+    if (otcOverview) {
+      renderOtc(otcOverview);
+      loadOtcPnl();
+    }
+  });
+});
+
+document.getElementById("otc-period-select")?.addEventListener("change", (e) => {
+  localStorage.setItem("otc_period", e.target.value);
+  loadOtcPnl();
+});
+
+document.getElementById("otc-settings-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const numOrNull = (id) => {
+    const v = document.getElementById(id)?.value;
+    return v === "" || v == null ? null : Number(v);
+  };
+  const payload = {
+    stake_usd: numOrNull("otc-stake"),
+    initial_bankroll_usd: numOrNull("otc-bankroll"),
+    daily_goal_usd: numOrNull("otc-daily-goal"),
+    monthly_goal_usd: numOrNull("otc-monthly-goal"),
+    daily_stop_loss_pct: numOrNull("otc-stop-loss-pct"),
+    usd_brl_rate: numOrNull("otc-usd-brl"),
+    stop_win_enabled: document.getElementById("otc-stop-win-enabled")?.checked || false,
+    stop_loss_enabled: document.getElementById("otc-stop-loss-enabled")?.checked || false,
+  };
+  const btn = document.getElementById("otc-save-btn");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/dashboard/otc/settings", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || "Falha ao salvar");
+    otcOverview = body.data || otcOverview;
+    renderOtc(otcOverview);
+    showSuccess("Configuração do IQ Option salva");
+  } catch (err) {
+    showError(err.message || "Falha ao salvar configuração");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Sincroniza botão de moeda com a preferência salva
+document.querySelectorAll(".currency-btn").forEach((b) => {
+  b.classList.toggle("active", b.dataset.currency === getOtcCurrency());
 });
 
 bindTableClicks();

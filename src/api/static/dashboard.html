@@ -10,7 +10,7 @@
   <link rel="manifest" href="/dashboard/static/manifest.webmanifest" />
   <link rel="icon" href="/dashboard/static/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/dashboard/static/icon.svg" />
-  <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=6" />
+  <link rel="stylesheet" href="/dashboard/static/dashboard.css?v=7" />
 </head>
 <body>
   <div id="login-view" class="wrap">
@@ -40,12 +40,21 @@
     <header class="app-header">
       <div class="header-brand">
         <h1>DIVAP Trader</h1>
-        <p class="subtitle">Demo Binance testnet · scan automático 15 min</p>
+        <p class="subtitle" id="header-subtitle">Demo Binance testnet · scan automático 15 min</p>
       </div>
       <div class="badges" id="status-badges"></div>
     </header>
 
-    <nav class="section-nav" aria-label="Atalhos">
+    <div class="view-switch" role="tablist" aria-label="Alternar conta">
+      <button type="button" class="view-switch-btn active" data-view="binance" role="tab">
+        <span class="view-switch-icon">🟡</span> Binance
+      </button>
+      <button type="button" class="view-switch-btn" data-view="otc" role="tab">
+        <span class="view-switch-icon">📈</span> IQ Option
+      </button>
+    </div>
+
+    <nav class="section-nav binance-only" aria-label="Atalhos">
       <a href="#overview-section">Visão</a>
       <a href="#scan-summary-section">Scan</a>
       <a href="#bankroll-section">Banca</a>
@@ -59,13 +68,13 @@
 
     <div class="toolbar">
       <button type="button" id="refresh-btn">Atualizar</button>
-      <button type="button" class="secondary" id="scan-btn">Disparar scan</button>
-      <button type="button" class="secondary" id="push-btn" title="Alertas de sinal alta confiança">🔔 Push</button>
+      <button type="button" class="secondary binance-only" id="scan-btn">Disparar scan</button>
+      <button type="button" class="secondary binance-only" id="push-btn" title="Alertas de sinal alta confiança">🔔 Push</button>
       <button type="button" class="secondary" id="logout-btn">Sair</button>
       <span class="subtitle" id="refresh-label"></span>
     </div>
 
-    <section id="overview-section" class="overview-section">
+    <section id="overview-section" class="overview-section binance-only">
       <h2>Visão geral</h2>
       <div class="overview-grid">
         <div class="overview-market">
@@ -79,7 +88,7 @@
       </div>
     </section>
 
-    <section id="scan-summary-section">
+    <section id="scan-summary-section" class="binance-only">
       <h2>Último scan — por que não operou?</h2>
       <p class="subtitle section-hint">Resumo do ciclo automático: pares analisados, setups detectados e bloqueios por gate.</p>
       <div class="scan-summary-panel card" id="scan-summary-panel">
@@ -87,7 +96,7 @@
       </div>
     </section>
 
-    <section id="bankroll-section">
+    <section id="bankroll-section" class="binance-only">
       <h2>Gestão da banca</h2>
       <div class="bankroll-panel card" id="bankroll-panel">
         <div class="bankroll-form">
@@ -103,24 +112,24 @@
       </div>
     </section>
 
-    <section id="profiles-section">
+    <section id="profiles-section" class="binance-only">
       <h2>Perfis — panorama do momento</h2>
       <p class="subtitle section-hint">Todos os perfis avaliados. Os perfis marcados em banca escaneiam e executam de forma independente.</p>
       <div class="profiles-grid" id="profiles-grid"></div>
     </section>
 
-    <details class="collapsible-section" id="readiness-details">
+    <details class="collapsible-section binance-only" id="readiness-details">
       <summary>Validação testnet (checklist)</summary>
       <div class="readiness-panel card" id="trading-readiness-panel"></div>
     </details>
 
-    <details class="collapsible-section">
+    <details class="collapsible-section binance-only">
       <summary>Desempenho por perfil (testnet)</summary>
       <div id="profile-performance-grid" class="profiles-grid"></div>
       <div id="profile-history-tabs" class="profile-history-tabs"></div>
     </details>
 
-    <section id="open-trades-section" class="section-open hidden">
+    <section id="open-trades-section" class="section-open binance-only hidden">
       <h2>Trades abertos</h2>
       <div class="table-wrap">
         <table>
@@ -136,14 +145,14 @@
       </div>
     </section>
 
-    <section id="pnl-chart-section" class="hidden">
+    <section id="pnl-chart-section" class="binance-only hidden">
       <h2>PnL acumulado</h2>
       <div class="chart-wrap">
         <canvas id="pnl-chart"></canvas>
       </div>
     </section>
 
-    <section id="trades-section">
+    <section id="trades-section" class="binance-only">
       <h2>Histórico de trades</h2>
       <div class="table-wrap">
         <table>
@@ -159,7 +168,7 @@
       </div>
     </section>
 
-    <section id="alerts-section">
+    <section id="alerts-section" class="binance-only">
       <h2>Alertas DIVAP</h2>
       <div class="filters">
         <label>Par
@@ -223,6 +232,89 @@
       </div>
     </section>
 
+    <section id="otc-view" class="otc-view">
+      <div class="otc-topbar">
+        <div>
+          <h2>IQ Option — Binárias OTC</h2>
+          <p class="subtitle" id="otc-status-line">Carregando…</p>
+        </div>
+        <div class="otc-currency" role="group" aria-label="Moeda">
+          <button type="button" class="currency-btn active" data-currency="usd">US$</button>
+          <button type="button" class="currency-btn" data-currency="brl">R$</button>
+        </div>
+      </div>
+
+      <div id="otc-stop-banner" class="otc-stop-banner hidden" role="status"></div>
+
+      <h3 class="otc-h">Banca & caixa</h3>
+      <div class="grid" id="otc-balance-grid"></div>
+
+      <h3 class="otc-h">Metas</h3>
+      <div class="otc-goals" id="otc-goals"></div>
+
+      <h3 class="otc-h">Operações</h3>
+      <div class="grid" id="otc-stats-grid"></div>
+
+      <h3 class="otc-h">Gale & proteções</h3>
+      <div class="grid" id="otc-martingale-grid"></div>
+
+      <section class="otc-pnl-section">
+        <div class="otc-pnl-head">
+          <h3 class="otc-h">Lucro / Prejuízo por período</h3>
+          <select id="otc-period-select" class="otc-select"></select>
+        </div>
+        <div class="grid grid-market" id="otc-period-totals"></div>
+        <div class="chart-wrap"><canvas id="otc-pnl-chart"></canvas></div>
+        <p class="subtitle" id="otc-pnl-total">—</p>
+      </section>
+
+      <section class="otc-settings-section">
+        <h3 class="otc-h">Gestão de banca & metas</h3>
+        <form id="otc-settings-form" class="otc-settings-form">
+          <label>Valor da entrada (US$)
+            <input type="number" id="otc-stake" min="0" step="1" placeholder="Ex: 5" />
+          </label>
+          <label>Banca inicial (US$)
+            <input type="number" id="otc-bankroll" min="0" step="10" placeholder="Ex: 1000" />
+          </label>
+          <label>Meta diária (US$)
+            <input type="number" id="otc-daily-goal" min="0" step="5" placeholder="Ex: 50" />
+          </label>
+          <label>Meta mensal (US$)
+            <input type="number" id="otc-monthly-goal" min="0" step="50" placeholder="Ex: 800" />
+          </label>
+          <label>Stop loss diário (% da banca)
+            <input type="number" id="otc-stop-loss-pct" min="0" max="100" step="1" placeholder="Ex: 20" />
+          </label>
+          <label>Cotação US$ → R$
+            <input type="number" id="otc-usd-brl" min="0" step="0.01" placeholder="Ex: 5.40" />
+          </label>
+          <label class="filter-inline">
+            <input type="checkbox" id="otc-stop-win-enabled" /> Stop win (pausar ao bater meta do dia)
+          </label>
+          <label class="filter-inline">
+            <input type="checkbox" id="otc-stop-loss-enabled" /> Stop loss diário (pausar ao perder o limite)
+          </label>
+          <button type="submit" class="secondary" id="otc-save-btn">Salvar configuração</button>
+        </form>
+      </section>
+
+      <section class="otc-trades-section">
+        <h3 class="otc-h">Operações recentes</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Ativo</th><th>Lado</th><th>Nível</th>
+                <th>Stake</th><th>Resultado</th><th>PnL</th><th>Order ID</th><th>Quando</th>
+              </tr>
+            </thead>
+            <tbody id="otc-trades-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
     <footer>
       <span id="footer-updated">—</span>
       <span id="scan-status">—</span>
@@ -231,6 +323,6 @@
   </div>
 
   <div id="modal-root"></div>
-  <script src="/dashboard/static/dashboard.js?v=8" defer></script>
+  <script src="/dashboard/static/dashboard.js?v=9" defer></script>
 </body>
 </html>

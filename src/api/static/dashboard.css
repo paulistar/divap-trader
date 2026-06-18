@@ -594,3 +594,118 @@ footer {
   th, td { padding: 0.45rem; font-size: 0.75rem; }
   .mini-chart { width: 56px; }
 }
+
+/* ===== Toggle Binance / IQ Option ===== */
+.view-switch {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.25rem;
+  margin-bottom: 1rem;
+}
+.view-switch-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.view-switch-btn:hover { color: var(--text); }
+.view-switch-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+.view-switch-icon { margin-right: 0.3rem; }
+
+/* Visibilidade controlada pelo modo */
+body[data-view="otc"] .binance-only { display: none !important; }
+#otc-view { display: none; }
+body[data-view="otc"] #otc-view { display: block; }
+
+/* ===== View OTC ===== */
+.otc-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.otc-topbar h2 { font-size: 1.05rem; color: var(--text); margin: 0; }
+.otc-h { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 1.25rem 0 0.6rem; }
+.otc-currency {
+  display: inline-flex;
+  gap: 0.2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.2rem;
+}
+.currency-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.currency-btn.active { background: var(--bg-muted); color: var(--text); }
+
+.otc-stop-banner {
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.otc-stop-banner.win { background: #14532d; border: 1px solid var(--success); color: #bbf7d0; }
+.otc-stop-banner.loss { background: #4c1d1d; border: 1px solid var(--error); color: #fecaca; }
+
+/* Metas (barra de progresso) */
+.otc-goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.otc-goal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+.otc-goal-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+.otc-goal-title { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.otc-goal-value { font-size: 1.05rem; font-weight: 600; }
+.otc-progress { height: 8px; background: var(--bg-muted); border-radius: 999px; overflow: hidden; }
+.otc-progress-bar { height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
+.otc-progress-bar.reached { background: var(--success); }
+.otc-goal-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.4rem; }
+
+/* PnL por período */
+.otc-pnl-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.otc-select {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+/* Formulário de configuração OTC */
+.otc-settings-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.85rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+}
+.otc-settings-form label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; color: var(--text-muted); }
+.otc-settings-form input[type="number"] {
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.5rem 0.6rem; font-size: 0.9rem;
+}
+.otc-settings-form .filter-inline { flex-direction: row; align-items: center; gap: 0.5rem; color: var(--text); }
+.otc-settings-form button[type="submit"] { grid-column: 1 / -1; justify-self: start; }

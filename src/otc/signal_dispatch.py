@@ -36,6 +36,18 @@ def dispatch_otc_signal(signal: OtcSignal) -> dict:
     cfg = load_otc_config()
     prepared = normalize_signal(signal)
 
+    from src.otc.guard import evaluate_otc_stop
+
+    stop_reason = evaluate_otc_stop(timezone=cfg.signal_timezone)
+    if stop_reason:
+        return {
+            "queued": False,
+            "skipped": True,
+            "reason": stop_reason,
+            "asset": prepared.asset,
+            "direction": prepared.direction,
+        }
+
     missed, reason = leg_window_missed(
         prepared,
         0,

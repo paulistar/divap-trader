@@ -119,6 +119,20 @@ SCHEMA_STATEMENTS: list[str] = [
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS otc_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        stake_usd NUMERIC(20, 2),
+        initial_bankroll_usd NUMERIC(20, 2),
+        daily_goal_usd NUMERIC(20, 2),
+        monthly_goal_usd NUMERIC(20, 2),
+        daily_stop_loss_pct NUMERIC(6, 2),
+        stop_win_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        stop_loss_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        usd_brl_rate NUMERIC(10, 4),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+    """,
 ]
 
 
