@@ -127,13 +127,40 @@ pip install git+https://github.com/Lu-Yi-Hsun/iqoptionapi.git
 
 ### Telegram automático (sinais da sala)
 
-1. Crie um bot com [@BotFather](https://t.me/BotFather) (ou use o `TELEGRAM_BOT_TOKEN` existente).
-2. **Desative privacy mode**: `/setprivacy` → bot → **Disable** (senão o bot não lê todas as mensagens do grupo).
-3. **Adicione o bot ao grupo/canal de sinais** como membro.
-4. Descubra o **chat_id** do grupo (ex.: `-1001234567890`) com [@userinfobot](https://t.me/userinfobot) ou enviando uma mensagem e consultando `getUpdates`.
-5. No Easypanel, configure:
-   - `OTC_TELEGRAM_CHAT_ID=-1001234567890`
-   - `OTC_TRADING_ENABLED=true`
-6. Deploy inclui o serviço **`otc-telegram`**, que faz long-polling e enfileira sinais no Celery no instante em que a mensagem chega.
+Dois modos em `otc.telegram.mode`:
+
+#### Modo `user` (recomendado — grupo privado de outro bot)
+
+Quando você **não pode adicionar seu bot** ao grupo de sinais (sala de terceiros), o sistema usa **sua conta Telegram** via Telethon — igual você lê no app.
+
+1. Crie credenciais em [my.telegram.org/apps](https://my.telegram.org/apps) → `api_id` + `api_hash`.
+2. Na sua máquina, gere a sessão (login SMS uma vez):
+
+```bash
+pip install telethon
+TELEGRAM_API_ID=123456 TELEGRAM_API_HASH=abc... python scripts/telegram_create_session.py
+```
+
+3. No Easypanel, configure:
+
+```
+TELEGRAM_API_ID=...
+TELEGRAM_API_HASH=...
+TELEGRAM_USER_SESSION=...   # string longa gerada pelo script
+OTC_TELEGRAM_CHAT_ID=@nome_do_grupo   # ou -1001234567890 / link t.me/...
+OTC_TRADING_ENABLED=true
+```
+
+4. Deploy sobe o serviço **`otc-telegram`**, que escuta mensagens novas e enfileira no Celery **no instante** em que o sinal chega.
+
+#### Modo `bot` (grupo/canal seu, com bot admin)
+
+1. Bot via [@BotFather](https://t.me/BotFather), `/setprivacy` → **Disable**.
+2. Adicione o bot ao **seu** grupo/canal de relay.
+3. `otc.telegram.mode: bot` + `TELEGRAM_BOT_TOKEN` + `OTC_TELEGRAM_CHAT_ID`.
+
+#### Relay opcional
+
+Se quiser, crie um **canal privado seu**, encaminhe sinais manualmente ou via Telethon, e use modo `bot` nesse canal.
 
 O listener ignora mensagens que não são sinais (`ENTRADA CONFIRMADA` + ativo + direção) e deduplica por `message_id` no Redis.

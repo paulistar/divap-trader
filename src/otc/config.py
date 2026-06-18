@@ -37,6 +37,7 @@ def load_otc_config() -> OtcProfileConfig:
         asset_aliases={str(k): str(v) for k, v in aliases_raw.items()},
         telegram=OtcTelegramConfig(
             enabled=bool(tg_raw.get("enabled", False)),
+            mode=str(tg_raw.get("mode", "user")).lower(),
             channel=str(tg_raw.get("channel", "")),
         ),
         signal_timezone=str(otc_raw.get("signal_timezone", "America/Sao_Paulo")),

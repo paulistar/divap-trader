@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.core.config import settings
 from src.otc.broker import IqOptionBroker
 from src.otc.config import load_otc_config, resolve_otc_telegram_chat_id
+from src.otc.telegram_user_listener import user_listener_configured
 from src.otc.iqoption_client import fetch_otc_capabilities, iqoption_configured, otc_transport
 from src.otc.iqoption_client import reset_iqoption_client as reset_connections
 from src.otc.mcp_client import mcp_configured
@@ -56,6 +57,8 @@ def build_otc_status() -> dict:
         },
         "assets": list(config.assets),
         "telegram_listener": config.telegram.enabled,
+        "telegram_mode": config.telegram.mode,
+        "telegram_user_configured": user_listener_configured(),
         "telegram_chat_id": resolve_otc_telegram_chat_id(config) or None,
         "divap_scan": False,
     }

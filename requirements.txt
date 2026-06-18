@@ -17,3 +17,4 @@ pywebpush>=2.0.0
 fxcmpy @ git+https://github.com/chaipat-ncm/fxcmpy.git
 websocket-client==0.56
 iqoptionapi @ git+https://github.com/Lu-Yi-Hsun/iqoptionapi.git
+telethon>=1.36.0

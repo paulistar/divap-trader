@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     )
     otc_trading_enabled: bool = Field(default=False, alias="OTC_TRADING_ENABLED")
     otc_telegram_chat_id: str = Field(default="", alias="OTC_TELEGRAM_CHAT_ID")
+    telegram_api_id: int = Field(default=0, alias="TELEGRAM_API_ID")
+    telegram_api_hash: str = Field(default="", alias="TELEGRAM_API_HASH")
+    telegram_user_session: str = Field(default="", alias="TELEGRAM_USER_SESSION")
 
     @field_validator("vapid_private_key", mode="before")
     @classmethod
@@ -86,6 +89,8 @@ class Settings(BaseSettings):
         "iqoption_password",
         "iqoption_mcp_token",
         "iqoption_mcp_url",
+        "telegram_api_hash",
+        "telegram_user_session",
         mode="before",
     )
     @classmethod

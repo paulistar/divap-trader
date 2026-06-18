@@ -4,11 +4,8 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from src.otc.models import OtcSignal
-from src.otc.telegram_listener import (
-    chat_id_matches,
-    extract_message,
-    process_telegram_text,
-)
+from src.otc.telegram_handler import process_incoming_message
+from src.otc.telegram_listener import chat_id_matches, extract_message
 
 
 SIGNAL_TEXT = """
@@ -41,14 +38,14 @@ def test_chat_id_matches_numeric() -> None:
     assert not chat_id_matches("-1001234567890", "-100999")
 
 
-@patch("src.otc.telegram_listener.is_duplicate_message", return_value=False)
-@patch("src.otc.telegram_listener.dispatch_otc_signal")
+@patch("src.otc.telegram_handler.is_duplicate_message", return_value=False)
+@patch("src.otc.telegram_handler.dispatch_otc_signal")
 def test_process_telegram_text_queues_signal(
     mock_dispatch: MagicMock,
     _mock_dedup: MagicMock,
 ) -> None:
     mock_dispatch.return_value = {"queued": True, "task_id": "abc"}
-    outcome = process_telegram_text(
+    outcome = process_incoming_message(
         "-1001234567890",
         SIGNAL_TEXT,
         99,
@@ -62,13 +59,13 @@ def test_process_telegram_text_queues_signal(
     assert signal.asset == "FORDOTC"
 
 
-@patch("src.otc.telegram_listener.is_duplicate_message", return_value=True)
-@patch("src.otc.telegram_listener.dispatch_otc_signal")
+@patch("src.otc.telegram_handler.is_duplicate_message", return_value=True)
+@patch("src.otc.telegram_handler.dispatch_otc_signal")
 def test_process_telegram_text_skips_duplicate(
     mock_dispatch: MagicMock,
     _mock_dedup: MagicMock,
 ) -> None:
-    outcome = process_telegram_text(
+    outcome = process_incoming_message(
         "-1001234567890",
         SIGNAL_TEXT,
         99,
@@ -79,7 +76,7 @@ def test_process_telegram_text_skips_duplicate(
 
 
 def test_process_telegram_text_ignores_other_chats() -> None:
-    outcome = process_telegram_text(
+    outcome = process_incoming_message(
         "-100999",
         SIGNAL_TEXT,
         1,

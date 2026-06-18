@@ -15,6 +15,7 @@ class OtcMartingale:
 @dataclass(frozen=True, slots=True)
 class OtcTelegramConfig:
     enabled: bool
+    mode: str
     channel: str
 
 

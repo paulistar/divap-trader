@@ -6,33 +6,15 @@ import time
 from typing import Any
 
 import httpx
-import redis
 
 from src.core.config import settings
 from src.otc.config import load_otc_config, resolve_otc_telegram_chat_id
-from src.otc.signal_dispatch import dispatch_otc_signal
-from src.otc.signal_parser import parse_telegram_signal
+from src.otc.telegram_handler import process_incoming_message
 
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}"
 POLL_TIMEOUT_SECONDS = 30
-DEDUP_TTL_SECONDS = 86_400
-
-
-def _redis_client() -> redis.Redis:
-    return redis.from_url(settings.redis_url, decode_responses=True)
-
-
-def _dedup_key(chat_id: str, message_id: int) -> str:
-    return f"otc:telegram:msg:{chat_id}:{message_id}"
-
-
-def is_duplicate_message(chat_id: str, message_id: int) -> bool:
-    client = _redis_client()
-    key = _dedup_key(chat_id, message_id)
-    created = client.set(key, "1", nx=True, ex=DEDUP_TTL_SECONDS)
-    return created is None
 
 
 def extract_message(update: dict[str, Any]) -> tuple[str, str, int] | None:
@@ -66,40 +48,12 @@ def chat_id_matches(configured: str, incoming: str) -> bool:
         return configured == incoming
 
 
-def process_telegram_text(
-    chat_id: str,
-    text: str,
-    message_id: int,
-    *,
-    source_chat_id: str,
-    dedup: bool = True,
-) -> dict | None:
-    if not chat_id_matches(source_chat_id, chat_id):
-        return None
-    if dedup and is_duplicate_message(chat_id, message_id):
-        logger.debug("OTC Telegram ignorando duplicata chat=%s msg=%s", chat_id, message_id)
-        return None
-
-    signal = parse_telegram_signal(text)
-    if signal is None:
-        return None
-
-    logger.info(
-        "OTC Telegram sinal detectado chat=%s msg=%s asset=%s entrada=%s",
-        chat_id,
-        message_id,
-        signal.asset,
-        signal.entry_time.strftime("%H:%M") if signal.entry_time else "?",
-    )
-    return dispatch_otc_signal(signal)
-
-
 def process_update(update: dict[str, Any], *, source_chat_id: str) -> dict | None:
     extracted = extract_message(update)
     if extracted is None:
         return None
     chat_id, text, message_id = extracted
-    return process_telegram_text(
+    return process_incoming_message(
         chat_id,
         text,
         message_id,
@@ -108,7 +62,9 @@ def process_update(update: dict[str, Any], *, source_chat_id: str) -> dict | Non
 
 
 def load_listener_offset() -> int:
-    client = _redis_client()
+    import redis
+
+    client = redis.from_url(settings.redis_url, decode_responses=True)
     raw = client.get("otc:telegram:offset")
     if raw is None:
         return 0
@@ -119,7 +75,12 @@ def load_listener_offset() -> int:
 
 
 def save_listener_offset(offset: int) -> None:
-    _redis_client().set("otc:telegram:offset", str(offset))
+    import redis
+
+    redis.from_url(settings.redis_url, decode_responses=True).set(
+        "otc:telegram:offset",
+        str(offset),
+    )
 
 
 def fetch_updates(token: str, offset: int) -> list[dict[str, Any]]:
@@ -140,7 +101,7 @@ def fetch_updates(token: str, offset: int) -> list[dict[str, Any]]:
 
 def listener_configured() -> bool:
     cfg = load_otc_config()
-    if not cfg.telegram.enabled:
+    if not cfg.telegram.enabled or cfg.telegram.mode != "bot":
         return False
     if not settings.telegram_bot_token.strip():
         return False
@@ -161,22 +122,17 @@ def run_forever() -> None:
     logging.basicConfig(level=settings.log_level.upper())
 
     cfg = load_otc_config()
-    if not cfg.telegram.enabled:
-        logger.error("otc.telegram.enabled=false — listener não iniciado")
-        sys.exit(1)
-
     token = settings.telegram_bot_token.strip()
     source_chat_id = resolve_otc_telegram_chat_id(cfg)
     if not token or not source_chat_id:
         logger.error(
-            "Configure TELEGRAM_BOT_TOKEN e OTC_TELEGRAM_CHAT_ID (ou otc.telegram.channel)"
+            "Modo bot: configure TELEGRAM_BOT_TOKEN e OTC_TELEGRAM_CHAT_ID"
         )
         sys.exit(1)
 
     ensure_polling_mode(token)
-
     logger.info(
-        "OTC Telegram listener ativo — chat=%s trading=%s dry_run=%s",
+        "OTC Telegram bot listener ativo — chat=%s trading=%s dry_run=%s",
         source_chat_id,
         settings.otc_trading_enabled,
         cfg.dry_run,
