@@ -10,7 +10,9 @@ from src.otc.models import OtcSignal
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEZONE = "America/Sao_Paulo"
-DEFAULT_MAX_LATENESS_SECONDS = 45
+DEFAULT_MAX_LATENESS_SECONDS = 0
+COARSE_SLEEP_BUFFER_SECONDS = 0.05
+FINE_POLL_INTERVAL_SECONDS = 0.005
 
 
 def _parse_timezone(name: str) -> ZoneInfo:
@@ -59,6 +61,35 @@ def resolve_leg_datetime(
     return candidate
 
 
+def lateness_seconds(now: datetime, target: datetime) -> int:
+    """Segundos inteiros após o alvo (16:22:00 → 16:22:31 = 31)."""
+    return max(0, int((now - target).total_seconds()))
+
+
+def leg_window_missed(
+    signal: OtcSignal,
+    level: int,
+    timezone_name: str,
+    *,
+    max_lateness_seconds: int = DEFAULT_MAX_LATENESS_SECONDS,
+    now: datetime | None = None,
+) -> tuple[bool, str | None]:
+    """True se o horário da perna já passou (tolerância zero por padrão)."""
+    tz = _parse_timezone(timezone_name)
+    now = now or datetime.now(tz)
+    target = resolve_leg_datetime(signal, level, timezone_name, now=now)
+    if target is None:
+        return False, None
+    late = lateness_seconds(now, target)
+    if late > max_lateness_seconds:
+        return (
+            True,
+            f"scheduled_time_missed:leg{level}:target={target.strftime('%H:%M:%S')}:"
+            f"lateness={late}s",
+        )
+    return False, None
+
+
 def wait_for_leg(
     signal: OtcSignal,
     level: int,
@@ -69,8 +100,8 @@ def wait_for_leg(
     now_fn=None,
 ) -> tuple[bool, str | None]:
     """
-    Aguarda até o horário da perna. Retorna (True, None) se OK para executar,
-    ou (False, reason) se o horário já passou além da tolerância.
+    Aguarda até o segundo exato do horário (ex.: 16:22:00).
+    Se já passou do alvo, rejeita — sem tolerância de dezenas de segundos.
     """
     tz = _parse_timezone(timezone_name)
     if now_fn is None:
@@ -80,32 +111,48 @@ def wait_for_leg(
     if target is None:
         return True, None
 
+    missed, reason = leg_window_missed(
+        signal,
+        level,
+        timezone_name,
+        max_lateness_seconds=max_lateness_seconds,
+        now=now_fn(),
+    )
+    if missed:
+        logger.warning("OTC leg %s rejeitada — %s", level, reason)
+        return False, reason
+
     now = now_fn()
     if now < target:
-        delay = (target - now).total_seconds()
+        remaining = (target - now).total_seconds()
         logger.info(
-            "OTC leg %s aguardando até %s (%s) — faltam %.0fs",
+            "OTC leg %s aguardando até %s (%s) — faltam %.2fs",
             level,
             target.strftime("%H:%M:%S"),
             timezone_name,
-            delay,
+            remaining,
         )
-        sleep_fn(delay)
-        now = now_fn()
+        coarse = remaining - COARSE_SLEEP_BUFFER_SECONDS
+        if coarse > 0:
+            sleep_fn(coarse)
+        while now_fn() < target:
+            sleep_fn(FINE_POLL_INTERVAL_SECONDS)
 
-    lateness = (now - target).total_seconds()
-    if lateness > max_lateness_seconds:
-        return (
-            False,
-            f"scheduled_time_missed:leg{level}:target={target.strftime('%H:%M')}:"
-            f"lateness={int(lateness)}s",
+    now = now_fn()
+    late = lateness_seconds(now, target)
+    if late > max_lateness_seconds:
+        reason = (
+            f"scheduled_time_missed:leg{level}:target={target.strftime('%H:%M:%S')}:"
+            f"lateness={late}s"
         )
+        logger.warning("OTC leg %s rejeitada após espera — %s", level, reason)
+        return False, reason
 
     logger.info(
-        "OTC leg %s no horário (alvo %s, atraso %.0fs)",
+        "OTC leg %s no horário exato (alvo %s, relógio %s)",
         level,
         target.strftime("%H:%M:%S"),
-        lateness,
+        now.strftime("%H:%M:%S"),
     )
     return True, None
 

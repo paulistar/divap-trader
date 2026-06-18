@@ -40,7 +40,7 @@ def load_otc_config() -> OtcProfileConfig:
             channel=str(tg_raw.get("channel", "")),
         ),
         signal_timezone=str(otc_raw.get("signal_timezone", "America/Sao_Paulo")),
-        entry_max_lateness_seconds=int(otc_raw.get("entry_max_lateness_seconds", 45)),
+        entry_max_lateness_seconds=int(otc_raw.get("entry_max_lateness_seconds", 0)),
     )
 
 

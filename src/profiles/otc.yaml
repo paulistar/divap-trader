@@ -39,7 +39,7 @@ otc:
   expiry_minutes: 1
   dry_run: false
   signal_timezone: America/Sao_Paulo
-  entry_max_lateness_seconds: 45
+  entry_max_lateness_seconds: 0
   martingale:
     enabled: true
     max_protections: 2

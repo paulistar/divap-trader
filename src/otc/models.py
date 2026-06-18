@@ -32,7 +32,7 @@ class OtcProfileConfig:
     asset_aliases: dict[str, str]
     telegram: OtcTelegramConfig
     signal_timezone: str = "America/Sao_Paulo"
-    entry_max_lateness_seconds: int = 45
+    entry_max_lateness_seconds: int = 0
 
 
 @dataclass(frozen=True, slots=True)

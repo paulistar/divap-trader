@@ -1,11 +1,12 @@
 """Tests for OTC entry-time scheduling (America/Sao_Paulo)."""
 
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from src.otc.models import OtcSignal
 from src.otc.schedule import (
     deserialize_signal,
+    leg_window_missed,
     resolve_leg_datetime,
     serialize_signal,
     wait_for_leg,
@@ -58,6 +59,7 @@ def test_wait_for_leg_sleeps_until_target() -> None:
     )
     tz = "America/Sao_Paulo"
     zone = ZoneInfo(tz)
+    target = datetime(2026, 6, 10, 16, 7, 0, tzinfo=zone)
     clock = {"now": datetime(2026, 6, 10, 16, 5, 30, tzinfo=zone)}
     slept: list[float] = []
 
@@ -66,7 +68,10 @@ def test_wait_for_leg_sleeps_until_target() -> None:
 
     def sleep_fn(seconds: float) -> None:
         slept.append(seconds)
-        clock["now"] = clock["now"].replace(minute=7, second=0, microsecond=0)
+        if seconds > 0.1:
+            clock["now"] = target - timedelta(milliseconds=40)
+        else:
+            clock["now"] = target
 
     ok, reason = wait_for_leg(
         signal,
@@ -77,11 +82,11 @@ def test_wait_for_leg_sleeps_until_target() -> None:
     )
     assert ok is True
     assert reason is None
-    assert len(slept) == 1
-    assert 85 <= slept[0] <= 95
+    assert clock["now"] == target
+    assert any(s > 80 for s in slept)
 
 
-def test_wait_for_leg_rejects_when_too_late() -> None:
+def test_wait_for_leg_rejects_one_second_late() -> None:
     signal = OtcSignal(
         asset="BTC/USD (OTC)",
         direction="buy",
@@ -90,12 +95,30 @@ def test_wait_for_leg_rejects_when_too_late() -> None:
     )
     tz = "America/Sao_Paulo"
     zone = ZoneInfo(tz)
-    now = datetime(2026, 6, 10, 16, 8, 30, tzinfo=zone)
+    now = datetime(2026, 6, 10, 16, 7, 1, tzinfo=zone)
 
-    ok, reason = wait_for_leg(signal, 0, tz, max_lateness_seconds=45, now_fn=lambda: now)
+    ok, reason = wait_for_leg(signal, 0, tz, max_lateness_seconds=0, now_fn=lambda: now)
     assert ok is False
     assert reason is not None
     assert "scheduled_time_missed" in reason
+    assert "lateness=1s" in reason
+
+
+def test_wait_for_leg_rejects_32_seconds_late() -> None:
+    signal = OtcSignal(
+        asset="BTC/USD (OTC)",
+        direction="buy",
+        expiry_minutes=1,
+        entry_time=datetime(1900, 1, 1, 16, 22),
+    )
+    tz = "America/Sao_Paulo"
+    zone = ZoneInfo(tz)
+    now = datetime(2026, 6, 10, 16, 22, 32, tzinfo=zone)
+
+    missed, reason = leg_window_missed(signal, 0, tz, max_lateness_seconds=0, now=now)
+    assert missed is True
+    assert reason is not None
+    assert "lateness=32s" in reason
 
 
 def test_signal_serialization_roundtrip() -> None:

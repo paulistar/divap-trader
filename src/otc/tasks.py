@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from src.core.celery_app import celery_app
 from src.otc.executor import OtcExecutor
-from src.otc.models import OtcSequenceResult, OtcSignal
-from src.otc.schedule import deserialize_signal, serialize_signal
+from src.otc.models import OtcSequenceResult, OtcSignal, OtcTradeResult
+from src.otc.schedule import deserialize_signal, leg_window_missed, serialize_signal
+from src.otc.config import load_otc_config
 
 
 def sequence_result_to_dict(result: OtcSequenceResult) -> dict:
@@ -49,5 +50,28 @@ def should_queue_otc_execution(signal: OtcSignal) -> bool:
 @celery_app.task(name="src.otc.tasks.execute_otc_signal")
 def execute_otc_signal(signal_payload: dict) -> dict:
     signal = deserialize_signal(signal_payload)
+    cfg = load_otc_config()
+    missed, reason = leg_window_missed(
+        signal,
+        0,
+        cfg.signal_timezone,
+        max_lateness_seconds=cfg.entry_max_lateness_seconds,
+    )
+    if missed:
+        failed = OtcSequenceResult(
+            executed=False,
+            reason=f"execution_failed:{reason}",
+            legs=(
+                OtcTradeResult(
+                    executed=False,
+                    reason=reason or "scheduled_time_missed",
+                    asset=signal.asset,
+                    direction=signal.direction,
+                ),
+            ),
+            asset=signal.asset,
+            direction=signal.direction,
+        )
+        return sequence_result_to_dict(failed)
     result = OtcExecutor().try_execute(signal)
     return sequence_result_to_dict(result)

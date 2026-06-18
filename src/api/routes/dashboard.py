@@ -449,7 +449,7 @@ async def dashboard_otc_signal(
     from src.otc.config import load_otc_config
     from src.otc.executor import OtcExecutor
     from src.otc.models import OtcSignal
-    from src.otc.schedule import resolve_leg_datetime, serialize_signal
+    from src.otc.schedule import leg_window_missed, resolve_leg_datetime, serialize_signal
     from src.otc.signal_parser import parse_telegram_signal
     from src.otc.tasks import execute_otc_signal, sequence_result_to_dict, should_queue_otc_execution
 
@@ -473,6 +473,18 @@ async def dashboard_otc_signal(
         )
 
     otc_config = load_otc_config()
+    missed, miss_reason = leg_window_missed(
+        signal,
+        0,
+        otc_config.signal_timezone,
+        max_lateness_seconds=otc_config.entry_max_lateness_seconds,
+    )
+    if missed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Horário de entrada já passou ({miss_reason}). Envie o sinal antes do Entrada:.",
+        )
+
     signal_payload = {
         "asset": signal.asset,
         "direction": signal.direction,
