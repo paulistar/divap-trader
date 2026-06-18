@@ -48,6 +48,7 @@ otc:
     - "CARDANO (OTC)"
     - "Litecoin (OTC)"
     - "EUR/USD (OTC)"
+    - "EUR/JPY (OTC)"
   asset_aliases:
     XRP/USDT: "Ripple (OTC)"
     XRP/USDT (OTC): "Ripple (OTC)"
@@ -67,6 +68,9 @@ otc:
     XRPUSDT: "Ripple (OTC)"
     FORDOTC: "Ford (OTC)"
     FORD: "Ford (OTC)"
+    EURJPYOTC: "EUR/JPY (OTC)"
+    EUR/JPY OTC: "EUR/JPY (OTC)"
+    EURJPY: "EUR/JPY (OTC)"
   telegram:
     enabled: false
     channel: ""
