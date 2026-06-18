@@ -5,7 +5,7 @@ import logging
 from src.otc.signal_dispatch import dispatch_otc_signal
 from src.otc.signal_parser import parse_telegram_signal
 from src.otc.telegram_dedup import is_duplicate_message
-from src.otc.telegram_listener import chat_id_matches
+from src.otc.telegram_utils import chat_id_matches
 
 logger = logging.getLogger(__name__)
 

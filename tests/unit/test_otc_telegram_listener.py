@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 
 from src.otc.models import OtcSignal
 from src.otc.telegram_handler import process_incoming_message
-from src.otc.telegram_listener import chat_id_matches, extract_message
+from src.otc.telegram_listener import extract_message
+from src.otc.telegram_utils import chat_id_matches
 
 
 SIGNAL_TEXT = """
