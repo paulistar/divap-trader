@@ -10,6 +10,21 @@ from src.otc.telegram_handler import process_incoming_message
 
 logger = logging.getLogger(__name__)
 
+HEARTBEAT_INTERVAL_SECONDS = 30
+
+
+async def _heartbeat_loop(client, interval: int = HEARTBEAT_INTERVAL_SECONDS) -> None:
+    """Marca o listener como vivo no Redis enquanto a conexão estiver ativa."""
+    from src.otc.heartbeat import record_listener_heartbeat
+
+    while True:
+        try:
+            if client.is_connected():
+                record_listener_heartbeat()
+        except Exception:
+            logger.debug("OTC heartbeat falhou", exc_info=True)
+        await asyncio.sleep(interval)
+
 
 async def _resolve_telethon_entity(client, source_chat: str):
     source_chat = source_chat.strip()
@@ -60,8 +75,11 @@ async def run_user_listener_async() -> None:
     entity = await _resolve_telethon_entity(client, source_chat)
     from telethon import utils
 
+    from src.otc.heartbeat import record_listener_heartbeat
+
     resolved_chat_id = str(utils.get_peer_id(entity))
     chat_label = getattr(entity, "title", None) or getattr(entity, "username", source_chat)
+    record_listener_heartbeat()
     logger.info(
         "OTC Telethon listener ativo — fonte=%s (id=%s) trading=%s dry_run=%s",
         chat_label,
@@ -89,7 +107,11 @@ async def run_user_listener_async() -> None:
         if outcome is not None:
             logger.info("OTC Telethon dispatch: %s", outcome)
 
-    await client.run_until_disconnected()
+    heartbeat_task = asyncio.create_task(_heartbeat_loop(client))
+    try:
+        await client.run_until_disconnected()
+    finally:
+        heartbeat_task.cancel()
 
 
 def run_forever() -> None:

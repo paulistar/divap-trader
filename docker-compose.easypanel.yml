@@ -104,6 +104,26 @@ services:
     depends_on:
       - redis
       - worker
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD", "python", "/app/scripts/otc_telegram_healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # Reinicia automaticamente containers marcados com label autoheal=true
+  # quando ficarem "unhealthy" (ex.: listener Telegram travado sem cair).
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "30"
+      AUTOHEAL_START_PERIOD: "60"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   postgres:
     image: timescale/timescaledb:latest-pg15
