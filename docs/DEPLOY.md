@@ -55,11 +55,13 @@ BINANCE_USE_TESTNET=false
 **OTC — IQ Option (cole no final do Environment):**
 
 ```env
-IQOPTION_EMAIL=seu@email.com
-IQOPTION_PASSWORD=sua_senha
+IQOPTION_MCP_TOKEN=seu_token_ai_integrations
+IQOPTION_MCP_URL=https://digital-options.mcp.iqoption.com
 IQOPTION_ACCOUNT_MODE=PRACTICE
 OTC_TRADING_ENABLED=false
 ```
+
+Token em IQ Option → Settings → AI integrations. Ver `docs/iqoption-setup.md`.
 
 > Ative **Create .env file** (toggle) se ainda não estiver ligado — o compose usa `env_file: .env`.
 

@@ -4,9 +4,19 @@ import logging
 import time
 from decimal import Decimal
 
+from src.core.config import settings
 from src.core.exceptions import ExchangeError
 from src.otc.config import load_otc_config, resolve_iq_asset
-from src.otc.iqoption_client import fetch_iqoption_balance, get_iqoption_client, iqoption_configured
+from src.otc.iqoption_client import (
+    fetch_iqoption_balance,
+    get_iqoption_client,
+    iqoption_configured,
+    legacy_configured,
+    mcp_find_asset_id,
+    mcp_pick_instrument,
+    otc_transport,
+)
+from src.otc.mcp_client import fetch_mcp_balance, mcp_call, reset_mcp_client
 from src.otc.models import OtcProfileConfig, OtcSignal, OtcTradeResult
 
 logger = logging.getLogger(__name__)
@@ -17,7 +27,7 @@ VENUE = "iqoption"
 
 
 class IqOptionBroker:
-    """Execução de opções binárias turbo (M1) na IQ Option."""
+    """Execução de opções binárias turbo (M1) na IQ Option via MCP ou iqoptionapi."""
 
     def __init__(self, config: OtcProfileConfig | None = None) -> None:
         self._config = config or load_otc_config()
@@ -25,6 +35,10 @@ class IqOptionBroker:
     @property
     def configured(self) -> bool:
         return iqoption_configured()
+
+    @property
+    def transport(self) -> str | None:
+        return otc_transport()
 
     def get_balance_usd(self) -> Decimal:
         return fetch_iqoption_balance()
@@ -59,11 +73,12 @@ class IqOptionBroker:
 
         if self._config.dry_run:
             logger.info(
-                "OTC dry-run: %s %s stake=%s expiry=%sm",
+                "OTC dry-run: %s %s stake=%s expiry=%sm transport=%s",
                 iq_asset,
                 signal.direction,
                 stake,
                 signal.expiry_minutes,
+                self.transport,
             )
             return OtcTradeResult(
                 executed=True,
@@ -78,6 +93,74 @@ class IqOptionBroker:
             return OtcTradeResult(
                 executed=False,
                 reason="iqoption_not_configured",
+                asset=iq_asset,
+                direction=signal.direction,
+            )
+
+        if self.transport == "mcp":
+            return self._place_binary_mcp(signal, iq_asset, stake)
+        return self._place_binary_legacy(signal, iq_asset, stake)
+
+    def _place_binary_mcp(
+        self,
+        signal: OtcSignal,
+        iq_asset: str,
+        stake: Decimal,
+    ) -> OtcTradeResult:
+        try:
+            _, balance_id = fetch_mcp_balance(self._config.account_mode)
+            asset_id, resolved_name = mcp_find_asset_id(iq_asset)
+            instrument_id, instrument_index = mcp_pick_instrument(
+                asset_id,
+                signal.direction,
+                signal.expiry_minutes,
+            )
+            trade_payload = mcp_call(
+                "place_trade",
+                {
+                    "balance_id": balance_id,
+                    "instrument_id": instrument_id,
+                    "instrument_index": instrument_index,
+                    "asset_id": asset_id,
+                    "amount": float(stake),
+                },
+            )
+        except ExchangeError as exc:
+            return OtcTradeResult(
+                executed=False,
+                reason=str(exc),
+                asset=iq_asset,
+                direction=signal.direction,
+                stake_usd=stake,
+            )
+
+        order_id = str(trade_payload.get("order_id") or "")
+        pnl_usd = self._wait_settlement_mcp(
+            asset_id=asset_id,
+            amount=stake,
+            duration_minutes=signal.expiry_minutes,
+        )
+        return OtcTradeResult(
+            executed=True,
+            reason="filled",
+            order_id=order_id or None,
+            asset=resolved_name,
+            direction=signal.direction,
+            stake_usd=stake,
+            pnl_usd=pnl_usd,
+            dry_run=False,
+        )
+
+    def _place_binary_legacy(
+        self,
+        signal: OtcSignal,
+        iq_asset: str,
+        stake: Decimal,
+    ) -> OtcTradeResult:
+        if not legacy_configured():
+            return OtcTradeResult(
+                executed=False,
+                reason="legacy_credentials_missing",
                 asset=iq_asset,
                 direction=signal.direction,
             )
@@ -110,7 +193,7 @@ class IqOptionBroker:
                 stake_usd=stake,
             )
 
-        pnl_usd = self._wait_settlement(api, order_id, duration)
+        pnl_usd = self._wait_settlement_legacy(api, order_id, duration)
         return OtcTradeResult(
             executed=True,
             reason="filled",
@@ -122,7 +205,56 @@ class IqOptionBroker:
             dry_run=False,
         )
 
-    def _wait_settlement(self, api: object, order_id: object, duration_minutes: int) -> Decimal | None:
+    def _wait_settlement_mcp(
+        self,
+        asset_id: int,
+        amount: Decimal,
+        duration_minutes: int,
+    ) -> Decimal | None:
+        wait_seconds = duration_minutes * 60 + 20
+        deadline = time.time() + wait_seconds
+        open_position_id: int | None = None
+
+        while time.time() < deadline:
+            try:
+                positions_payload = mcp_call("list_positions")
+            except ExchangeError:
+                time.sleep(2)
+                continue
+
+            positions = positions_payload.get("positions") or []
+            if open_position_id is None:
+                for pos in positions:
+                    if int(pos.get("asset_id") or 0) != asset_id:
+                        continue
+                    if Decimal(str(pos.get("amount") or 0)) != amount:
+                        continue
+                    open_position_id = int(pos["position_id"])
+                    break
+                time.sleep(2)
+                continue
+
+            still_open = any(
+                int(pos.get("position_id") or 0) == open_position_id for pos in positions
+            )
+            if still_open:
+                time.sleep(2)
+                continue
+
+            history_payload = mcp_call("get_trade_history", {"skip": 0, "limit": 20})
+            for row in history_payload.get("history") or []:
+                if int(row.get("position_id") or 0) == open_position_id:
+                    return Decimal(str(row.get("profit") or 0))
+            return None
+
+        return None
+
+    def _wait_settlement_legacy(
+        self,
+        api: object,
+        order_id: object,
+        duration_minutes: int,
+    ) -> Decimal | None:
         wait_seconds = duration_minutes * 60 + 15
         deadline = time.time() + wait_seconds
         while time.time() < deadline:
@@ -135,3 +267,10 @@ class IqOptionBroker:
                 return Decimal(str(profit or 0))
             time.sleep(2)
         return None
+
+
+def reset_broker_connections() -> None:
+    reset_mcp_client()
+    from src.otc.iqoption_client import reset_iqoption_client
+
+    reset_iqoption_client()

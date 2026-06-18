@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from src.core.scan_plan import get_active_scan_plans
 from src.otc.config import load_otc_config, resolve_iq_asset
 from src.otc.executor import OtcExecutor
+from src.otc.iqoption_client import otc_transport
 from src.otc.models import OtcSignal
 from src.otc.signal_parser import parse_telegram_signal
 from src.profiles.loader import load_profile
@@ -39,14 +40,14 @@ def test_otc_config_loaded_from_yaml() -> None:
     assert config.default_stake_usd == Decimal("5")
     assert config.martingale.enabled is True
     assert config.martingale.max_protections == 2
-    assert "XRP/USDT (OTC)" in config.assets
+    assert "Ripple (OTC)" in config.assets
 
 
 def test_resolve_iq_asset_aliases() -> None:
     config = load_otc_config()
-    assert resolve_iq_asset("XRP/USDT", config) == "XRP/USDT (OTC)"
+    assert resolve_iq_asset("XRP/USDT", config) == "Ripple (OTC)"
     assert resolve_iq_asset("FORDOTC", config) == "Ford (OTC)"
-    assert resolve_iq_asset("BTCUSDT", config) == "BTC/USDT (OTC)"
+    assert resolve_iq_asset("BTCUSDT", config) == "BTC/USD (OTC)"
 
 
 def test_parse_telegram_signal() -> None:
@@ -95,9 +96,16 @@ def test_otc_executor_dry_run() -> None:
         dry_run=True,
     )
     executor = OtcExecutor(broker=broker, trade_repo=MagicMock())
+    executor._repo.count_open_trades.return_value = 0
     with patch("src.otc.executor.settings") as mock_settings:
         mock_settings.otc_trading_enabled = False
         result = executor.try_execute(signal)
     assert result.executed is True
     assert result.dry_run is True
     broker.place_binary.assert_called_once()
+
+
+def test_otc_transport_prefers_mcp() -> None:
+    with patch("src.otc.iqoption_client.mcp_configured", return_value=True):
+        with patch("src.otc.iqoption_client.legacy_configured", return_value=True):
+            assert otc_transport() == "mcp"

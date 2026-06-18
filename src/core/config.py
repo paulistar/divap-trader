@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     iqoption_email: str = Field(default="", alias="IQOPTION_EMAIL")
     iqoption_password: str = Field(default="", alias="IQOPTION_PASSWORD")
     iqoption_account_mode: str = Field(default="PRACTICE", alias="IQOPTION_ACCOUNT_MODE")
+    iqoption_mcp_token: str = Field(default="", alias="IQOPTION_MCP_TOKEN")
+    iqoption_mcp_url: str = Field(
+        default="https://digital-options.mcp.iqoption.com",
+        alias="IQOPTION_MCP_URL",
+    )
     otc_trading_enabled: bool = Field(default=False, alias="OTC_TRADING_ENABLED")
 
     @field_validator("vapid_private_key", mode="before")
@@ -78,6 +83,8 @@ class Settings(BaseSettings):
         "fxcm_access_token",
         "iqoption_email",
         "iqoption_password",
+        "iqoption_mcp_token",
+        "iqoption_mcp_url",
         mode="before",
     )
     @classmethod
