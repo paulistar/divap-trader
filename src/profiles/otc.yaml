@@ -52,6 +52,7 @@ otc:
     - "EUR/USD (OTC)"
     - "EUR/JPY (OTC)"
     - "EUR/GBP (OTC)"
+    - "EUR/AUD (OTC)"
   asset_aliases:
     XRP/USDT: "Ripple (OTC)"
     XRP/USDT (OTC): "Ripple (OTC)"
@@ -78,6 +79,10 @@ otc:
     EURGBPOTC: "EUR/GBP (OTC)"
     EURGBP: "EUR/GBP (OTC)"
     EUR/GBP OTC: "EUR/GBP (OTC)"
+    EURAUDOTC: "EUR/AUD (OTC)"
+    EUR/AUD (OTC): "EUR/AUD (OTC)"
+    EURAUD: "EUR/AUD (OTC)"
+    EUR/AUD OTC: "EUR/AUD (OTC)"
   telegram:
     enabled: false
     channel: ""
