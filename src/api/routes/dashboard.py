@@ -78,6 +78,7 @@ class OtcSignalBody(BaseModel):
     direction: str | None = Field(default=None, pattern=r"^(buy|sell)$")
     expiry_minutes: int | None = Field(default=None, ge=1, le=60)
     protection_level: int = Field(default=0, ge=0, le=5)
+    max_auto_protections: int | None = Field(default=None, ge=0, le=5)
 
 
 async def require_dashboard_session(request: Request) -> None:
@@ -460,6 +461,7 @@ async def dashboard_otc_signal(
             direction=body.direction,
             expiry_minutes=body.expiry_minutes or 1,
             protection_level=body.protection_level,
+            max_auto_protections=body.max_auto_protections,
         )
     else:
         raise HTTPException(
@@ -468,6 +470,7 @@ async def dashboard_otc_signal(
         )
 
     result = OtcExecutor().try_execute(signal)
+    last_leg = result.legs[-1] if result.legs else None
     return ApiResponse(
         success=True,
         data={
@@ -476,16 +479,39 @@ async def dashboard_otc_signal(
                 "direction": signal.direction,
                 "expiry_minutes": signal.expiry_minutes,
                 "protection_level": signal.protection_level,
+                "max_auto_protections": signal.max_auto_protections,
             },
             "result": {
                 "executed": result.executed,
                 "reason": result.reason,
-                "trade_id": result.trade_id,
-                "order_id": result.order_id,
                 "asset": result.asset,
-                "stake_usd": str(result.stake_usd),
-                "pnl_usd": str(result.pnl_usd) if result.pnl_usd is not None else None,
+                "direction": result.direction,
+                "total_pnl_usd": (
+                    str(result.total_pnl_usd) if result.total_pnl_usd is not None else None
+                ),
                 "dry_run": result.dry_run,
+                "legs": [
+                    {
+                        "protection_level": leg.protection_level,
+                        "executed": leg.executed,
+                        "reason": leg.reason,
+                        "trade_id": leg.trade_id,
+                        "order_id": leg.order_id,
+                        "asset": leg.asset,
+                        "stake_usd": str(leg.stake_usd),
+                        "pnl_usd": str(leg.pnl_usd) if leg.pnl_usd is not None else None,
+                        "dry_run": leg.dry_run,
+                    }
+                    for leg in result.legs
+                ],
+                "trade_id": last_leg.trade_id if last_leg else None,
+                "order_id": last_leg.order_id if last_leg else None,
+                "stake_usd": str(last_leg.stake_usd) if last_leg else None,
+                "pnl_usd": (
+                    str(last_leg.pnl_usd)
+                    if last_leg and last_leg.pnl_usd is not None
+                    else None
+                ),
             },
         },
     )

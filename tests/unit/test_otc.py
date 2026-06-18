@@ -7,7 +7,7 @@ from src.core.scan_plan import get_active_scan_plans
 from src.otc.config import load_otc_config, resolve_iq_asset
 from src.otc.executor import OtcExecutor
 from src.otc.iqoption_client import otc_transport
-from src.otc.models import OtcSignal
+from src.otc.models import OtcSignal, OtcTradeResult
 from src.otc.signal_parser import parse_telegram_signal
 from src.profiles.loader import load_profile
 
@@ -56,7 +56,7 @@ def test_parse_telegram_signal() -> None:
     assert signal.asset == "XRP/USDT"
     assert signal.direction == "buy"
     assert signal.expiry_minutes == 1
-    assert signal.protection_level == 1
+    assert signal.protection_level == 0
 
 
 def test_parse_telegram_signal_venda() -> None:
@@ -84,24 +84,29 @@ def test_active_scan_plans_skip_otc_profile() -> None:
 def test_otc_executor_dry_run() -> None:
     signal = OtcSignal(asset="XRP/USDT", direction="buy", expiry_minutes=1)
     broker = MagicMock()
-    broker.place_binary.return_value = MagicMock(
+    broker.place_binary.return_value = OtcTradeResult(
         executed=True,
         reason="dry_run",
-        trade_id=None,
-        order_id=None,
         asset="XRP/USDT (OTC)",
         direction="buy",
         stake_usd=Decimal("5"),
         pnl_usd=None,
         dry_run=True,
     )
+    config = load_otc_config()
+    from dataclasses import replace
+
+    dry_config = replace(config, dry_run=True)
     executor = OtcExecutor(broker=broker, trade_repo=MagicMock())
+    executor._config = dry_config
     executor._repo.count_open_trades.return_value = 0
     with patch("src.otc.executor.settings") as mock_settings:
         mock_settings.otc_trading_enabled = False
         result = executor.try_execute(signal)
     assert result.executed is True
     assert result.dry_run is True
+    assert len(result.legs) == 1
+    assert result.legs[0].dry_run is True
     broker.place_binary.assert_called_once()
 
 

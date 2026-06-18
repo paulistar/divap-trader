@@ -18,7 +18,14 @@ _ENTRY_TIME_RE = re.compile(
     r"(?:entrada|entry|hor[aá]rio)\s*[:\-]?\s*(\d{1,2}:\d{2})",
     re.IGNORECASE,
 )
-_PROTECTION_RE = re.compile(r"prote(?:ç|c)ão\s*(\d+)", re.IGNORECASE)
+_MAX_PROTECTIONS_RE = re.compile(
+    r"(?:fazer\s+at[eé]\s+|at[eé]\s+)?(\d+)\s+prote(?:ç|c)[õo]es",
+    re.IGNORECASE,
+)
+_MANUAL_PROTECTION_LEVEL_RE = re.compile(
+    r"(?:^|\n)\s*(?:executar\s+)?prote(?:ç|c)ão\s*(\d+)\s*(?:manual|$)",
+    re.IGNORECASE,
+)
 
 
 def _normalize_direction(raw: str) -> str:
@@ -63,10 +70,15 @@ def parse_telegram_signal(text: str) -> OtcSignal | None:
         except ValueError:
             entry_time = None
 
+    max_auto_protections: int | None = None
+    max_match = _MAX_PROTECTIONS_RE.search(text)
+    if max_match:
+        max_auto_protections = int(max_match.group(1))
+
     protection_level = 0
-    protection_match = _PROTECTION_RE.search(text)
-    if protection_match:
-        protection_level = int(protection_match.group(1))
+    manual_level_match = _MANUAL_PROTECTION_LEVEL_RE.search(text)
+    if manual_level_match:
+        protection_level = int(manual_level_match.group(1))
 
     return OtcSignal(
         asset=asset,
@@ -75,4 +87,5 @@ def parse_telegram_signal(text: str) -> OtcSignal | None:
         entry_time=entry_time,
         raw_text=text,
         protection_level=protection_level,
+        max_auto_protections=max_auto_protections,
     )

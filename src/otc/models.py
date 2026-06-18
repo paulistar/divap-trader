@@ -41,6 +41,7 @@ class OtcSignal:
     entry_time: datetime | None = None
     raw_text: str = ""
     protection_level: int = 0
+    max_auto_protections: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,4 +54,16 @@ class OtcTradeResult:
     direction: str = ""
     stake_usd: Decimal = Decimal("0")
     pnl_usd: Decimal | None = None
+    dry_run: bool = False
+    protection_level: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class OtcSequenceResult:
+    executed: bool
+    reason: str
+    legs: tuple[OtcTradeResult, ...]
+    asset: str = ""
+    direction: str = ""
+    total_pnl_usd: Decimal | None = None
     dry_run: bool = False

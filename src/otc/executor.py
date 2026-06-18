@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -8,7 +9,14 @@ from src.core.config import settings
 from src.data.repositories.trade_repo import TradeRepository
 from src.otc.broker import IqOptionBroker, MARKET, PROFILE_ID, VENUE
 from src.otc.config import load_otc_config
-from src.otc.models import OtcSignal, OtcTradeResult
+from src.otc.martingale import (
+    is_loss,
+    is_win,
+    max_auto_protections_for_signal,
+    sequence_reason,
+    stake_for_level,
+)
+from src.otc.models import OtcSequenceResult, OtcSignal, OtcTradeResult
 
 logger = logging.getLogger(__name__)
 
@@ -25,30 +33,78 @@ class OtcExecutor:
         self._broker = broker or IqOptionBroker(self._config)
         self._repo = trade_repo or TradeRepository()
 
-    def try_execute(self, signal: OtcSignal) -> OtcTradeResult:
+    def try_execute(self, signal: OtcSignal) -> OtcSequenceResult:
         if not settings.otc_trading_enabled and not self._config.dry_run:
-            return OtcTradeResult(
-                executed=False,
-                reason="otc_trading_disabled",
-                asset=signal.asset,
-                direction=signal.direction,
+            return self._sequence_result(
+                signal,
+                (
+                    OtcTradeResult(
+                        executed=False,
+                        reason="otc_trading_disabled",
+                        asset=signal.asset,
+                        direction=signal.direction,
+                    ),
+                ),
             )
 
         open_count = self._repo.count_open_trades(PROFILE_ID)
         if open_count >= self._config.max_open_trades:
-            return OtcTradeResult(
-                executed=False,
-                reason="max_open_trades",
-                asset=signal.asset,
-                direction=signal.direction,
+            return self._sequence_result(
+                signal,
+                (
+                    OtcTradeResult(
+                        executed=False,
+                        reason="max_open_trades",
+                        asset=signal.asset,
+                        direction=signal.direction,
+                    ),
+                ),
             )
 
-        stake = self._stake_for_signal(signal)
+        max_protections = max_auto_protections_for_signal(signal, self._config.martingale)
+        start_level = max(0, signal.protection_level)
+        legs: list[OtcTradeResult] = []
+
+        for level in range(start_level, max_protections + 1):
+            leg_signal = replace(signal, protection_level=level)
+            leg_result = self._execute_leg(leg_signal, level)
+            legs.append(leg_result)
+
+            if not leg_result.executed:
+                break
+            if leg_result.dry_run:
+                break
+            if leg_result.pnl_usd is None:
+                logger.warning(
+                    "OTC leg %s sem PnL — interrompe sequência martingale",
+                    level,
+                )
+                break
+            if is_win(leg_result):
+                logger.info("OTC sequência venceu na proteção nível %s", level)
+                break
+            if is_loss(leg_result) and level < max_protections:
+                logger.info(
+                    "OTC loss nível %s — próxima proteção %s",
+                    level,
+                    level + 1,
+                )
+                continue
+            break
+
+        return self._sequence_result(signal, tuple(legs), max_protections)
+
+    def _execute_leg(self, signal: OtcSignal, level: int) -> OtcTradeResult:
+        stake = stake_for_level(
+            self._config.default_stake_usd,
+            self._config.martingale,
+            level,
+        )
         result = self._broker.place_binary(signal, stake_usd=stake)
         if not result.executed:
-            return result
+            return replace(result, protection_level=level)
 
-        trade_id = self._persist_trade(signal, result)
+        trade_id = self._persist_trade(signal, result, level)
         return OtcTradeResult(
             executed=True,
             reason=result.reason,
@@ -59,17 +115,49 @@ class OtcExecutor:
             stake_usd=result.stake_usd,
             pnl_usd=result.pnl_usd,
             dry_run=result.dry_run,
+            protection_level=level,
         )
 
-    def _stake_for_signal(self, signal: OtcSignal) -> Decimal:
-        base = self._config.default_stake_usd
-        if not self._config.martingale.enabled or signal.protection_level <= 0:
-            return base
-        level = min(signal.protection_level, self._config.martingale.max_protections)
-        multiplier = self._config.martingale.multiplier ** level
-        return (base * multiplier).quantize(Decimal("0.01"))
+    def _sequence_result(
+        self,
+        signal: OtcSignal,
+        legs: tuple[OtcTradeResult, ...],
+        max_protections: int | None = None,
+    ) -> OtcSequenceResult:
+        max_prot = (
+            max_protections
+            if max_protections is not None
+            else max_auto_protections_for_signal(signal, self._config.martingale)
+        )
+        executed = any(leg.executed for leg in legs)
+        reason = sequence_reason(legs, max_prot)
+        total_pnl = self._total_pnl(legs)
+        asset = legs[-1].asset if legs else signal.asset
+        direction = legs[-1].direction if legs else signal.direction
+        dry_run = any(leg.dry_run for leg in legs)
+        return OtcSequenceResult(
+            executed=executed,
+            reason=reason,
+            legs=legs,
+            asset=asset,
+            direction=direction,
+            total_pnl_usd=total_pnl,
+            dry_run=dry_run,
+        )
 
-    def _persist_trade(self, signal: OtcSignal, result: OtcTradeResult) -> int | None:
+    @staticmethod
+    def _total_pnl(legs: tuple[OtcTradeResult, ...]) -> Decimal | None:
+        pnls = [leg.pnl_usd for leg in legs if leg.pnl_usd is not None]
+        if not pnls:
+            return None
+        return sum(pnls, Decimal("0"))
+
+    def _persist_trade(
+        self,
+        signal: OtcSignal,
+        result: OtcTradeResult,
+        protection_level: int,
+    ) -> int | None:
         if result.dry_run:
             return None
 
@@ -101,18 +189,18 @@ class OtcExecutor:
             venue=VENUE,
         )
         if status == "closed" and pnl is not None and trade_id:
-            exit_price = Decimal("0")
             pnl_pct = (
                 (pnl / result.stake_usd * Decimal("100"))
                 if result.stake_usd > 0
                 else Decimal("0")
             )
+            close_reason = "expiry" if protection_level == 0 else f"expiry_p{protection_level}"
             self._repo.close_trade(
                 trade_id=trade_id,
-                exit_price=exit_price,
+                exit_price=Decimal("0"),
                 pnl_usdt=pnl,
                 pnl_pct=pnl_pct,
-                close_reason="expiry",
+                close_reason=close_reason,
                 closed_at=now,
             )
         return trade_id
