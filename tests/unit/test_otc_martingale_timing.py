@@ -78,6 +78,78 @@ def test_martingale_waits_next_leg_while_settling_previous() -> None:
     assert sync_until.second == 0
 
 
+def test_three_leg_sequence_each_protection_on_time() -> None:
+    """Entrada + 1ª + 2ª proteção: cada perna sincroniza para o horário seguinte."""
+    signal = parse_telegram_signal(EURAUD_SIGNAL)
+    assert signal is not None
+
+    broker = MagicMock()
+    broker.open_binary.side_effect = [
+        _open_leg("EUR/AUD (OTC)", Decimal("5"), "main-order"),
+        _open_leg("EUR/AUD (OTC)", Decimal("11"), "prot1-order"),
+        _open_leg("EUR/AUD (OTC)", Decimal("24.20"), "prot2-order"),
+    ]
+    # entrada loss, 1ª proteção loss, 2ª proteção win
+    broker.wait_settlement.side_effect = [Decimal("-5"), Decimal("-11"), Decimal("12.10")]
+
+    executor = OtcExecutor(broker=broker, trade_repo=MagicMock())
+    executor._repo.count_open_trades.return_value = 0
+    executor._config = replace(executor._config, dry_run=False)
+
+    with patch("src.otc.executor.settings") as mock_settings:
+        mock_settings.otc_trading_enabled = True
+        with patch("src.otc.executor.wait_for_leg", return_value=(True, None)):
+            result = executor.try_execute(signal)
+
+    assert result.reason == "sequence_win"
+    assert len(result.legs) == 3
+    assert broker.open_binary.call_count == 3
+    assert broker.wait_settlement.call_count == 3
+
+    calls = broker.wait_settlement.call_args_list
+    sync0 = calls[0].kwargs.get("sync_until")
+    sync1 = calls[1].kwargs.get("sync_until")
+    sync2 = calls[2].kwargs.get("sync_until")
+
+    # entrada sincroniza para 1ª proteção (16:52)
+    assert sync0 is not None and (sync0.hour, sync0.minute, sync0.second) == (16, 52, 0)
+    # 1ª proteção sincroniza para 2ª proteção (16:53)
+    assert sync1 is not None and (sync1.hour, sync1.minute, sync1.second) == (16, 53, 0)
+    # 2ª proteção é a última — sem sincronização (não trava em loop)
+    assert sync2 is None
+
+
+def test_wait_settlement_hard_timeout_without_sync() -> None:
+    """Última perna (sync_until=None) não pode rodar para sempre."""
+    from src.otc.broker import IqOptionBroker
+
+    broker = IqOptionBroker()
+    ctx = OtcSettlementContext(
+        transport="legacy",
+        resolved_asset="EUR/AUD (OTC)",
+        direction="buy",
+        stake_usd=Decimal("24.20"),
+        duration_minutes=1,
+        order_id="2",
+        legacy_order_id=2,
+    )
+    clock = {"now": datetime(2026, 6, 10, 16, 53, 0)}
+
+    def now_fn() -> datetime:
+        return clock["now"]
+
+    def sleep_fn(seconds: float) -> None:
+        from datetime import timedelta
+
+        clock["now"] = clock["now"] + timedelta(seconds=seconds)
+
+    broker._poll_settlement_once = lambda _ctx: None  # type: ignore[method-assign]
+    pnl = broker.wait_settlement(ctx, sync_until=None, sleep_fn=sleep_fn, now_fn=now_fn)
+    assert pnl is None
+    # parou perto do teto (1min + 25s), não em loop infinito
+    assert (clock["now"] - datetime(2026, 6, 10, 16, 53, 0)).total_seconds() <= 95
+
+
 def test_wait_settlement_holds_pnl_until_sync_until() -> None:
     from src.otc.broker import IqOptionBroker
 

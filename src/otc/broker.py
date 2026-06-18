@@ -27,6 +27,7 @@ SETTLEMENT_POLL_FAST_SECONDS = 0.1
 SETTLEMENT_POLL_NORMAL_SECONDS = 0.5
 SETTLEMENT_AGGRESSIVE_WINDOW_SECONDS = 8
 SETTLEMENT_GRACE_AFTER_DEADLINE_SECONDS = 2.0
+SETTLEMENT_MAX_EXTRA_SECONDS = 25
 
 
 class IqOptionBroker:
@@ -141,17 +142,22 @@ class IqOptionBroker:
         now_fn=None,
     ) -> Decimal | None:
         """Aguarda PnL. Com `sync_until`, sincroniza relógio para martingale no segundo exato."""
-        from datetime import datetime
+        from datetime import datetime, timedelta
 
         if now_fn is None:
             tz = sync_until.tzinfo if sync_until is not None else None
             now_fn = lambda: datetime.now(tz) if tz else datetime.now()
 
-        deadline = None
-        if sync_until is not None:
-            from datetime import timedelta
+        # Teto absoluto por duração — evita loop infinito na última perna (sync_until=None)
+        hard_deadline = now_fn() + timedelta(
+            seconds=ctx.duration_minutes * 60 + SETTLEMENT_MAX_EXTRA_SECONDS
+        )
 
-            deadline = sync_until + timedelta(seconds=SETTLEMENT_GRACE_AFTER_DEADLINE_SECONDS)
+        sync_deadline = None
+        if sync_until is not None:
+            sync_deadline = sync_until + timedelta(
+                seconds=SETTLEMENT_GRACE_AFTER_DEADLINE_SECONDS
+            )
 
         while True:
             pnl = self._poll_settlement_once(ctx)
@@ -163,11 +169,18 @@ class IqOptionBroker:
                     sleep_until(sync_until, sleep_fn=sleep_fn, now_fn=now_fn)
                 return pnl
 
-            if deadline is not None and now >= deadline:
+            if sync_deadline is not None and now >= sync_deadline:
                 logger.warning(
-                    "OTC settlement timeout após %s (order=%s)",
-                    sync_until.strftime("%H:%M:%S") if sync_until else "?",
+                    "OTC settlement timeout sync após %s (order=%s)",
+                    sync_until.strftime("%H:%M:%S"),
                     ctx.order_id,
+                )
+                return None
+            if now >= hard_deadline:
+                logger.warning(
+                    "OTC settlement timeout máximo (order=%s, duração=%smin)",
+                    ctx.order_id,
+                    ctx.duration_minutes,
                 )
                 return None
 
