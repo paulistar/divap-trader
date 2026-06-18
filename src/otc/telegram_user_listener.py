@@ -11,6 +11,29 @@ from src.otc.telegram_handler import process_incoming_message
 logger = logging.getLogger(__name__)
 
 
+async def _resolve_telethon_entity(client, source_chat: str):
+    source_chat = source_chat.strip()
+    if source_chat.startswith("@"):
+        return await client.get_entity(source_chat)
+
+    try:
+        chat_id = int(source_chat)
+    except ValueError:
+        return await client.get_entity(source_chat)
+
+    async for dialog in client.iter_dialogs(limit=200):
+        if dialog.id == chat_id:
+            return dialog.entity
+
+    if str(chat_id).startswith("-100"):
+        from telethon.tl.types import PeerChannel
+
+        channel_id = int(str(chat_id)[4:])
+        return await client.get_entity(PeerChannel(channel_id))
+
+    return await client.get_entity(chat_id)
+
+
 def user_listener_configured() -> bool:
     cfg = load_otc_config()
     if not cfg.telegram.enabled or cfg.telegram.mode != "user":
@@ -34,7 +57,7 @@ async def run_user_listener_async() -> None:
 
     client = TelegramClient(StringSession(session), api_id, api_hash)
     await client.start()
-    entity = await client.get_entity(source_chat)
+    entity = await _resolve_telethon_entity(client, source_chat)
     resolved_chat_id = str(entity.id)
     chat_label = getattr(entity, "title", None) or getattr(entity, "username", source_chat)
     logger.info(
