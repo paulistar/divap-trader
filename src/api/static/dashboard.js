@@ -1074,6 +1074,8 @@ async function loadDashboard() {
 function refreshTick() {
   if (getViewMode() === "otc") {
     loadOtc();
+  } else if (getViewMode() === "settings") {
+    loadDashboardSettings();
   } else {
     loadDashboard();
   }
@@ -1192,7 +1194,9 @@ let otcPnlLoaded = false;
 const DEFAULT_USD_BRL = 5.4;
 
 function getViewMode() {
-  return localStorage.getItem("divap_view") === "otc" ? "otc" : "binance";
+  const mode = localStorage.getItem("divap_view");
+  if (mode === "otc" || mode === "settings") return mode;
+  return "binance";
 }
 function getOtcCurrency() {
   return localStorage.getItem("otc_currency") === "brl" ? "brl" : "usd";
@@ -1233,7 +1237,7 @@ function card(label, value, { cls = "", sub = "", highlight = false } = {}) {
 }
 
 function applyView(mode) {
-  const view = mode === "otc" ? "otc" : "binance";
+  const view = mode === "otc" || mode === "settings" ? mode : "binance";
   localStorage.setItem("divap_view", view);
   document.body.setAttribute("data-view", view);
   document.querySelectorAll(".view-switch-btn").forEach((btn) => {
@@ -1241,13 +1245,18 @@ function applyView(mode) {
   });
   const subtitle = document.getElementById("header-subtitle");
   if (subtitle) {
-    subtitle.textContent =
-      view === "otc"
-        ? "IQ Option · binárias OTC via Telegram"
-        : "Demo Binance testnet · scan automático 15 min";
+    if (view === "otc") {
+      subtitle.textContent = "IQ Option · binárias OTC via Telegram";
+    } else if (view === "settings") {
+      subtitle.textContent = "Configurações gerais · Binance e IQ Option";
+    } else {
+      subtitle.textContent = "Demo Binance testnet · scan automático 15 min";
+    }
   }
   if (view === "otc") {
     loadOtc();
+  } else if (view === "settings") {
+    loadDashboardSettings();
   } else {
     loadDashboard();
   }

@@ -627,6 +627,10 @@ footer {
 body[data-view="otc"] .binance-only { display: none !important; }
 #otc-view { display: none; }
 body[data-view="otc"] #otc-view { display: block; }
+#settings-section { display: none; }
+body[data-view="settings"] .binance-only { display: none !important; }
+body[data-view="settings"] #otc-view { display: none !important; }
+body[data-view="settings"] #settings-section { display: block; }
 
 /* ===== View OTC ===== */
 .otc-topbar {
