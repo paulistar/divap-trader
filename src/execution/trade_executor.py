@@ -93,6 +93,15 @@ class TradeExecutor:
                 direction=signal.direction,
             )
 
+        if self._repo.count_open_trades() >= settings.trading_max_open_trades:
+            return TradeExecutionResult(
+                trade_id=None,
+                executed=False,
+                reason="max_open_trades_global",
+                symbol=signal.symbol,
+                direction=signal.direction,
+            )
+
         if self._repo.count_open_trades(effective_profile_id) >= execution.max_open_trades:
             return TradeExecutionResult(
                 trade_id=None,

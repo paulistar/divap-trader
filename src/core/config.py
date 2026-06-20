@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     trading_block_on_context_reject: bool = Field(
         default=True, alias="TRADING_BLOCK_ON_CONTEXT_REJECT"
     )
-    trading_max_open_trades: int = Field(default=5, alias="TRADING_MAX_OPEN_TRADES")
+    trading_max_open_trades: int = Field(default=50, alias="TRADING_MAX_OPEN_TRADES")
     trading_dry_run: bool = Field(default=False, alias="TRADING_DRY_RUN")
 
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")

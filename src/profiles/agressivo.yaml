@@ -6,7 +6,7 @@ execution:
   min_confidence: medium
   block_on_reject: true
   min_risk_reward: "1.8"
-  max_open_trades: 6
+  max_open_trades: 50
   allowed_timeframes: ["1h", "4h"]
   allocation_multiplier: "1.25"
 advisor:

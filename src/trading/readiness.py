@@ -116,13 +116,14 @@ def build_trading_readiness() -> dict:
 
     repo = TradeRepository()
     open_count = repo.count_open_trades()
-    capacity_ok = open_count < execution.max_open_trades
+    max_open = settings.trading_max_open_trades
+    capacity_ok = open_count < max_open
     _check(
         checks,
         check_id="open_capacity",
         label="Vagas para novos trades",
         ok=capacity_ok,
-        detail=f"{open_count} abertos / máx. {execution.max_open_trades}",
+        detail=f"{open_count} abertos / máx. {max_open}",
     )
 
     performance = build_profile_performance()

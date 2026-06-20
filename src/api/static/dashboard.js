@@ -122,7 +122,7 @@ function buildDashboardSettingsPayloadFromForm() {
     binance_use_testnet: getChecked("settings-binance-testnet"),
     trading_min_confidence: getVal("settings-min-confidence"),
     trading_block_on_context_reject: getChecked("settings-block-reject"),
-    trading_max_open_trades: Number(getVal("settings-max-open") || 5),
+    trading_max_open_trades: Number(getVal("settings-max-open") || 50),
     trading_dry_run: getChecked("settings-dry-run"),
     context_enabled: getChecked("settings-context-enabled"),
     context_news_limit: Number(getVal("settings-news-limit") || 5),
@@ -587,7 +587,7 @@ async function loadDashboardSettings() {
     setChecked("settings-binance-testnet", !!bin.use_testnet);
     setVal("settings-min-confidence", bin.min_confidence || "high");
     setChecked("settings-block-reject", !!bin.block_on_reject);
-    setVal("settings-max-open", String(bin.max_open_trades ?? 5));
+    setVal("settings-max-open", String(bin.max_open_trades ?? 50));
     setChecked("settings-dry-run", !!bin.dry_run);
     setChecked("settings-context-enabled", !!bin.context_enabled);
     setVal("settings-news-limit", String(bin.context_news_limit ?? 5));
