@@ -50,6 +50,11 @@ services:
     restart: unless-stopped
     expose:
       - "80"
+    networks:
+      default: {}
+      easypanel:
+        aliases:
+          - martstudios_divap-trader_app
     environment:
       <<: *shared-env
       PORT: "80"
@@ -161,3 +166,8 @@ services:
 
 volumes:
   pgdata:
+
+networks:
+  easypanel:
+    external: true
+    name: easypanel
