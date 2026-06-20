@@ -93,6 +93,25 @@ async function fetchBalance() {
   return body.data || null;
 }
 
+async function fetchDashboardSettings() {
+  const res = await fetch("/dashboard/settings", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Erro ${res.status}`);
+  return body.data || {};
+}
+
+async function saveDashboardSettings(payload) {
+  const res = await fetch("/dashboard/settings", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Erro ${res.status}`);
+  return body.data || {};
+}
+
 async function login(secret) {
   const res = await fetch("/dashboard/auth", {
     method: "POST",
@@ -487,6 +506,35 @@ async function saveBankroll(activeProfileIds, monthlyTarget) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || "Falha ao salvar banca");
   return body.data;
+}
+
+async function loadDashboardSettings() {
+  try {
+    const data = await fetchDashboardSettings();
+    const bin = data.binance || {};
+    const otc = data.otc || {};
+    const binToggle = document.getElementById("binance-trading-toggle");
+    const otcToggle = document.getElementById("otc-trading-toggle");
+    if (binToggle) binToggle.checked = !!bin.trading_enabled;
+    if (otcToggle) otcToggle.checked = !!otc.trading_enabled;
+  } catch (_) {
+    // silencioso — aba Configurações é opcional
+  }
+}
+
+async function saveDashboardSettingsFromForm() {
+  const binToggle = document.getElementById("binance-trading-toggle");
+  const otcToggle = document.getElementById("otc-trading-toggle");
+  const payload = {
+    binance_trading_enabled: binToggle ? !!binToggle.checked : undefined,
+    otc_trading_enabled: otcToggle ? !!otcToggle.checked : undefined,
+  };
+  try {
+    await saveDashboardSettings(payload);
+    showSuccess("Configurações atualizadas (válidas até próximo deploy).");
+  } catch (err) {
+    showError(err.message || "Falha ao salvar configurações");
+  }
 }
 
 function profileFitClass(status) {
@@ -1038,6 +1086,7 @@ function showApp() {
   syncPushButtonState();
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshTick, REFRESH_MS);
+  loadDashboardSettings();
 }
 
 function showLogin() {
@@ -1133,6 +1182,9 @@ document.getElementById("save-bankroll-btn")?.addEventListener("click", async ()
     showError(err.message || "Falha ao salvar");
   }
 });
+
+document.getElementById("binance-trading-toggle")?.addEventListener("change", saveDashboardSettingsFromForm);
+document.getElementById("otc-trading-toggle")?.addEventListener("change", saveDashboardSettingsFromForm);
 
 /* ===================== IQ Option (OTC) ===================== */
 let otcOverview = null;

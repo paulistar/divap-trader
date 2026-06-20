@@ -92,6 +92,13 @@ class OtcSettingsBody(BaseModel):
     usd_brl_rate: Decimal | None = Field(default=None, ge=0)
 
 
+class DashboardSettingsBody(BaseModel):
+    """Configurações rápidas do painel (não persistem entre deploys)."""
+
+    binance_trading_enabled: bool | None = None
+    otc_trading_enabled: bool | None = None
+
+
 async def require_dashboard_session(request: Request) -> None:
     if settings.app_env == "development":
         return
@@ -263,6 +270,63 @@ async def dashboard_push_status(
         data={
             "configured": vapid_configured(),
             "subscriptions": len(subs),
+        },
+    )
+
+
+@router.get("/dashboard/settings", include_in_schema=False)
+async def dashboard_settings(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    """
+    Configurações rápidas do painel:
+    - Binance: TRADING_ENABLED / TRADING_MODE
+    - IQ Option: OTC_TRADING_ENABLED
+    """
+    from src.otc.service import build_otc_status
+
+    return ApiResponse(
+        success=True,
+        data={
+            "binance": {
+                "trading_enabled": settings.trading_enabled,
+                "trading_mode": settings.trading_mode,
+            },
+            "otc": {
+                "trading_enabled": settings.otc_trading_enabled,
+                "status": build_otc_status(),
+            },
+        },
+    )
+
+
+@router.post("/dashboard/settings", include_in_schema=False)
+async def dashboard_settings_update(
+    body: DashboardSettingsBody,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    """
+    Atualiza toggles em memória.
+    Importante: não persiste em .env/Easypanel — após deploy volta ao padrão.
+    """
+    if body.binance_trading_enabled is not None:
+        settings.trading_enabled = bool(body.binance_trading_enabled)
+    if body.otc_trading_enabled is not None:
+        settings.otc_trading_enabled = bool(body.otc_trading_enabled)
+
+    from src.otc.service import build_otc_status
+
+    return ApiResponse(
+        success=True,
+        data={
+            "binance": {
+                "trading_enabled": settings.trading_enabled,
+                "trading_mode": settings.trading_mode,
+            },
+            "otc": {
+                "trading_enabled": settings.otc_trading_enabled,
+                "status": build_otc_status(),
+            },
         },
     )
 

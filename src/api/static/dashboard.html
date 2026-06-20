@@ -315,6 +315,42 @@
       </section>
     </section>
 
+    <section id="settings-section" class="settings-section">
+      <h2>Configurações</h2>
+      <p class="subtitle section-hint">
+        Liga/desliga a execução automática em cada conta. Não altera dados históricos.
+      </p>
+      <div class="settings-grid">
+        <section class="settings-card">
+          <h3>Binance</h3>
+          <p class="subtitle">
+            Execução automática dos sinais DIVAP na Binance (testnet ou live, conforme ambiente).
+          </p>
+          <label class="toggle-row">
+            <span>
+              Trading automático Binance
+              <span class="hint">TRADING_ENABLED</span>
+            </span>
+            <input type="checkbox" id="binance-trading-toggle" />
+          </label>
+        </section>
+
+        <section class="settings-card">
+          <h3>IQ Option (OTC)</h3>
+          <p class="subtitle">
+            Liga/desliga execução automática dos sinais do Telegram na IQ Option.
+          </p>
+          <label class="toggle-row">
+            <span>
+              Trading automático OTC
+              <span class="hint">OTC_TRADING_ENABLED</span>
+            </span>
+            <input type="checkbox" id="otc-trading-toggle" />
+          </label>
+        </section>
+      </div>
+    </section>
+
     <footer class="binance-only">
       <span id="footer-updated">—</span>
       <span id="scan-status">—</span>
@@ -323,6 +359,6 @@
   </div>
 
   <div id="modal-root"></div>
-  <script src="/dashboard/static/dashboard.js?v=11" defer></script>
+  <script src="/dashboard/static/dashboard.js?v=12" defer></script>
 </body>
 </html>
