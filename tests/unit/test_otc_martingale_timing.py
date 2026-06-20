@@ -185,3 +185,69 @@ def test_wait_settlement_holds_pnl_until_sync_until() -> None:
     pnl = broker.wait_settlement(ctx, sync_until=sync_until, sleep_fn=sleep_fn, now_fn=now_fn)
     assert pnl == Decimal("-5")
     assert clock["now"] >= sync_until
+
+
+def test_protection_leg_allows_lateness_after_settlement() -> None:
+    """Reproduz Ford 11:14 — loss confirmado 3s após horário da proteção."""
+    from dataclasses import replace
+    from zoneinfo import ZoneInfo
+
+    signal = parse_telegram_signal(
+        """
+✅ ENTRADA CONFIRMADA ✅
+🌎 Ativo: FORDOTC
+⏳ Expiração: M1
+📊 Direção: 🔴 VENDA
+⏰ Entrada: 11:14
+👉 Fazer até 2 proteções em caso de loss!
+1º PROTEÇÃO: TERMINA EM: 11:15h
+2º PROTEÇÃO: TERMINA EM: 11:16h
+"""
+    )
+    assert signal is not None
+    tz = ZoneInfo("America/Sao_Paulo")
+    broker = MagicMock()
+    broker.open_binary.side_effect = [
+        _open_leg("Ford (OTC)", Decimal("5"), "main-order"),
+        _open_leg("Ford (OTC)", Decimal("11"), "prot-order"),
+    ]
+    broker.wait_settlement.side_effect = [Decimal("-5"), Decimal("9.48")]
+
+    executor = OtcExecutor(broker=broker, trade_repo=MagicMock())
+    executor._repo.count_open_trades.return_value = 0
+    executor._config = replace(
+        executor._config,
+        dry_run=False,
+        entry_max_lateness_seconds=0,
+        protection_max_lateness_seconds=30,
+    )
+
+    # Leg 0 ok no horário; leg 1 chega 3s atrasada (settlement MCP)
+    wait_calls: list[int] = []
+
+    def wait_side_effect(sig, level, tz_name, *, max_lateness_seconds=0, **kwargs):
+        wait_calls.append((level, max_lateness_seconds))
+        if level == 0:
+            return True, None
+        now = datetime(2026, 6, 20, 11, 15, 3, tzinfo=tz)
+        missed, reason = __import__(
+            "src.otc.schedule", fromlist=["leg_window_missed"]
+        ).leg_window_missed(
+            sig,
+            level,
+            tz_name,
+            max_lateness_seconds=max_lateness_seconds,
+            now=now,
+        )
+        return (not missed, reason)
+
+    with patch("src.otc.executor.settings") as mock_settings:
+        mock_settings.otc_trading_enabled = True
+        with patch("src.otc.executor.wait_for_leg", side_effect=wait_side_effect):
+            result = executor.try_execute(signal)
+
+    assert wait_calls[0] == (0, 0)
+    assert wait_calls[1] == (1, 30)
+    assert result.reason == "sequence_win"
+    assert len(result.legs) == 2
+    assert broker.open_binary.call_count == 2

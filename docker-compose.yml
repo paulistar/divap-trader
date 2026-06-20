@@ -20,7 +20,20 @@ services:
   worker:
     build: .
     restart: unless-stopped
-    command: celery -A src.core.celery_app worker -l info
+    command: celery -A src.core.celery_app worker -Q celery -l info
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://divap:divap@postgres:5432/divap
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+
+  worker-otc:
+    build: .
+    restart: unless-stopped
+    command: celery -A src.core.celery_app worker -Q otc -c 4 -l info
     env_file:
       - .env
     environment:

@@ -40,6 +40,8 @@ otc:
   dry_run: false
   signal_timezone: America/Sao_Paulo
   entry_max_lateness_seconds: 0
+  # Proteções: tolerância após settlement da perna anterior (logs: loss confirmado +3s)
+  protection_max_lateness_seconds: 30
   martingale:
     enabled: true
     max_protections: 2
@@ -83,6 +85,13 @@ otc:
     EUR/AUD (OTC): "EUR/AUD (OTC)"
     EURAUD: "EUR/AUD (OTC)"
     EUR/AUD OTC: "EUR/AUD (OTC)"
+    Litecoin: "Litecoin (OTC)"
+    LTC/USDT: "Litecoin (OTC)"
+    LTCUSDT: "Litecoin (OTC)"
+    BNB: "BNB/USDT (OTC)"
+    BNBUSDT: "BNB/USDT (OTC)"
+    NVDAOTC: "Nvidia (OTC)"
+    NIKEOTC: "Nike, Inc. (OTC)"
   telegram:
     enabled: true
     mode: user

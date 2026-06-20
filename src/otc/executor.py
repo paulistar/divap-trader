@@ -126,11 +126,16 @@ class OtcExecutor:
         use_schedule = has_scheduled_legs(signal)
 
         if use_schedule:
+            max_lateness = (
+                self._config.entry_max_lateness_seconds
+                if level == 0
+                else self._config.protection_max_lateness_seconds
+            )
             ok, skip_reason = wait_for_leg(
                 signal,
                 level,
                 self._config.signal_timezone,
-                max_lateness_seconds=self._config.entry_max_lateness_seconds,
+                max_lateness_seconds=max_lateness,
             )
             if not ok:
                 return OtcTradeResult(

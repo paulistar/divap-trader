@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from src.core.scan_plan import get_active_scan_plans
 from src.otc.config import load_otc_config, resolve_iq_asset
 from src.otc.executor import OtcExecutor
-from src.otc.iqoption_client import otc_transport
+from src.otc.iqoption_client import mcp_pick_instrument, otc_transport
 from src.otc.models import OtcSignal, OtcTradeResult
 from src.otc.signal_parser import parse_telegram_signal
 from src.profiles.loader import load_profile
@@ -32,6 +32,7 @@ def test_otc_profile_exists_and_isolated() -> None:
 
 
 def test_otc_config_loaded_from_yaml() -> None:
+    load_otc_config.cache_clear()
     config = load_otc_config()
     assert config.profile_id == "otc"
     assert config.venue == "iqoption"
@@ -40,6 +41,7 @@ def test_otc_config_loaded_from_yaml() -> None:
     assert config.default_stake_usd == Decimal("5")
     assert config.martingale.enabled is True
     assert config.martingale.max_protections == 2
+    assert config.protection_max_lateness_seconds == 30
     assert "Ripple (OTC)" in config.assets
 
 
@@ -47,6 +49,8 @@ def test_resolve_iq_asset_aliases() -> None:
     config = load_otc_config()
     assert resolve_iq_asset("XRP/USDT", config) == "Ripple (OTC)"
     assert resolve_iq_asset("FORDOTC", config) == "Ford (OTC)"
+    assert resolve_iq_asset("Litecoin", config) == "Litecoin (OTC)"
+    assert resolve_iq_asset("NVDAOTC", config) == "Nvidia (OTC)"
     assert resolve_iq_asset("BTCUSDT", config) == "BTC/USD (OTC)"
 
 
@@ -114,3 +118,40 @@ def test_otc_transport_prefers_mcp() -> None:
     with patch("src.otc.iqoption_client.mcp_configured", return_value=True):
         with patch("src.otc.iqoption_client.legacy_configured", return_value=True):
             assert otc_transport() == "mcp"
+
+
+def test_mcp_pick_instrument_prefers_open_window() -> None:
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 6, 18, 19, 38, 0, tzinfo=UTC)
+    payload = {
+        "instruments": [
+            {
+                "instrument_index": 1,
+                "period_seconds": 60,
+                "deadline": "2026-06-18T19:38:30Z",
+                "expiration": "2026-06-18T19:39:00Z",
+                "instruments": [
+                    {"instrument_id": "expired-spt", "strike": "SPT", "direction": "call"},
+                ],
+            },
+            {
+                "instrument_index": 2,
+                "period_seconds": 60,
+                "deadline": "2026-06-18T19:39:30Z",
+                "expiration": "2026-06-18T19:40:00Z",
+                "instruments": [
+                    {"instrument_id": "open-spt", "strike": "SPT", "direction": "call"},
+                ],
+            },
+        ]
+    }
+    with patch("src.otc.iqoption_client.mcp_call", return_value=payload):
+        instrument_id, instrument_index = mcp_pick_instrument(
+            2120,
+            "buy",
+            1,
+            now=now,
+        )
+    assert instrument_id == "open-spt"
+    assert instrument_index == 2

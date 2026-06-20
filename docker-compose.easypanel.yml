@@ -66,7 +66,22 @@ services:
   worker:
     build: .
     restart: unless-stopped
-    command: celery -A src.core.celery_app worker -l info
+    command: celery -A src.core.celery_app worker -Q celery -l info
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://divap:${POSTGRES_PASSWORD:-divap}@postgres:5432/divap
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+
+  # Sinais OTC do Telegram — fila dedicada para não esperar scan/monitor DIVAP.
+  worker-otc:
+    build: .
+    restart: unless-stopped
+    command: celery -A src.core.celery_app worker -Q otc -c 4 -l info
     environment:
       <<: *shared-env
       DATABASE_URL: postgresql://divap:${POSTGRES_PASSWORD:-divap}@postgres:5432/divap
@@ -103,7 +118,7 @@ services:
       - .env
     depends_on:
       - redis
-      - worker
+      - worker-otc
     labels:
       autoheal: "true"
     healthcheck:

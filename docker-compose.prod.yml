@@ -11,6 +11,10 @@ services:
     environment:
       APP_ENV: production
 
+  worker-otc:
+    environment:
+      APP_ENV: production
+
   beat:
     environment:
       APP_ENV: production

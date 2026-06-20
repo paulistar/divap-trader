@@ -47,7 +47,7 @@ def should_queue_otc_execution(signal: OtcSignal) -> bool:
     return signal.entry_time is not None or bool(signal.protection_schedule)
 
 
-@celery_app.task(name="src.otc.tasks.execute_otc_signal")
+@celery_app.task(name="src.otc.tasks.execute_otc_signal", queue="otc")
 def execute_otc_signal(signal_payload: dict) -> dict:
     signal = deserialize_signal(signal_payload)
     cfg = load_otc_config()

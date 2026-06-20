@@ -34,6 +34,7 @@ class OtcProfileConfig:
     telegram: OtcTelegramConfig
     signal_timezone: str = "America/Sao_Paulo"
     entry_max_lateness_seconds: int = 0
+    protection_max_lateness_seconds: int = 30
 
 
 @dataclass(frozen=True, slots=True)

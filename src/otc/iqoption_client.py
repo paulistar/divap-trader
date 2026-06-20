@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from decimal import Decimal
 from functools import lru_cache
 from typing import Any
@@ -110,15 +111,27 @@ def mcp_find_asset_id(iq_asset_name: str) -> tuple[int, str]:
     raise ExchangeError(f"Ativo OTC indisponível na IQ Option (MCP): {iq_asset_name}")
 
 
+def _parse_mcp_deadline(raw: str | None) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def mcp_pick_instrument(
     asset_id: int,
     direction: str,
     expiry_minutes: int,
+    *,
+    now: datetime | None = None,
 ) -> tuple[str, int]:
     mcp_direction = "call" if direction == "buy" else "put"
     payload = mcp_call("get_instruments", {"asset_id": asset_id, "direction": mcp_direction})
     windows = payload.get("instruments") or []
     target_seconds = max(60, expiry_minutes * 60)
+    now = now or datetime.now(UTC)
 
     candidates = [
         window
@@ -131,7 +144,17 @@ def mcp_pick_instrument(
     if not candidates:
         raise ExchangeError(f"Sem instrumentos MCP para asset_id={asset_id}")
 
-    window = candidates[0]
+    open_windows = [
+        window
+        for window in candidates
+        if (deadline := _parse_mcp_deadline(window.get("deadline"))) is not None
+        and deadline > now
+    ]
+    if open_windows:
+        open_windows.sort(key=lambda w: str(w.get("expiration") or ""))
+        window = open_windows[0]
+    else:
+        window = candidates[0]
     strikes = window.get("instruments") or []
     chosen = next((s for s in strikes if str(s.get("strike")) == "SPT"), None)
     if chosen is None:

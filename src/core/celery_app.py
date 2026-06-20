@@ -15,6 +15,9 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    task_routes={
+        "src.otc.tasks.execute_otc_signal": {"queue": "otc"},
+    },
     beat_schedule={
         "scan-divap-setups": {
             "task": "src.alerts.scheduler.scan_all_symbols",
