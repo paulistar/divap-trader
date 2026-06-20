@@ -337,6 +337,56 @@ section h2 {
 }
 .profile-card .profile-stats span { color: var(--text-muted); display: block; }
 .profile-card .profile-stats strong { color: var(--text); font-size: 0.85rem; }
+
+.invezt-briefing-card {
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.12), rgba(15, 23, 42, 0.6));
+}
+.invezt-briefing-card .invezt-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  margin-bottom: 0.65rem;
+}
+.invezt-briefing-card .invezt-title { font-weight: 600; font-size: 0.95rem; }
+.invezt-briefing-card .invezt-meta { font-size: 0.72rem; color: var(--text-muted); }
+.invezt-briefing-card .invezt-headline {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-bottom: 0.75rem;
+}
+.invezt-briefing-card .invezt-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+.invezt-briefing-card .invezt-col h4 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  margin: 0 0 0.35rem;
+}
+.invezt-briefing-card .invezt-picks { list-style: none; padding: 0; margin: 0; }
+.invezt-briefing-card .invezt-picks li {
+  font-size: 0.78rem;
+  padding: 0.2rem 0;
+  color: var(--text);
+}
+.invezt-briefing-card .invezt-picks .bias-bullish { color: var(--success); }
+.invezt-briefing-card .invezt-picks .bias-neutral { color: var(--warning); }
+.invezt-briefing-card .invezt-picks .dir-buy { color: var(--success); }
+.invezt-briefing-card .invezt-picks .dir-sell { color: var(--error); }
+.invezt-briefing-card .invezt-empty {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
 .profile-history-tabs { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
 .profile-history-block {
   background: var(--bg-card);

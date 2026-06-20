@@ -30,6 +30,7 @@ def _build_prompt(
     *,
     active_profile_id: str,
     goal_reached: bool,
+    invezt_briefing: dict | None = None,
 ) -> str:
     profiles_block = []
     for snap in snapshots:
@@ -39,6 +40,20 @@ def _build_prompt(
             f"status={a.status}; regras: {a.detail}; tagline: {snap.profile.tagline}"
         )
 
+    invezt_block = ""
+    if invezt_briefing and invezt_briefing.get("latest"):
+        latest = invezt_briefing["latest"]
+        crypto = latest.get("crypto_picks") or []
+        forex = latest.get("forex_picks") or []
+        invezt_block = f"""
+Briefing Maia/Invezt PREMIUM (Telegram, mais recente):
+- Título: {latest.get('title')}
+- Tipo: {latest.get('kind')}
+- Resumo: {latest.get('strategic_summary') or latest.get('headline') or '—'}
+- Cripto: {', '.join(f"{p.get('symbol')} ({p.get('bias')})" for p in crypto[:6]) or '—'}
+- Forex: {', '.join(f"{p.get('pair')} {p.get('direction')}" for p in forex[:4]) or '—'}
+"""
+
     return f"""Contexto de mercado agora:
 - Fear & Greed: {market.get('fear_greed')}
 - Veredito dominante: {market.get('dominant_verdict')}
@@ -47,7 +62,7 @@ def _build_prompt(
 - Mercado 24h: {market.get('market_cap_change_24h_pct')}%
 - Perfil ativo na execução: {active_profile_id}
 - Meta mensal atingida (modo protegido): {'sim' if goal_reached else 'não'}
-
+{invezt_block}
 Perfis (avaliação rule-based):
 {chr(10).join(profiles_block)}
 
@@ -72,6 +87,7 @@ def generate_profile_insights(
     *,
     active_profile_id: str,
     goal_reached: bool = False,
+    invezt_briefing: dict | None = None,
 ) -> dict[str, str]:
     if not settings.openai_api_key:
         return {}
@@ -87,6 +103,7 @@ def generate_profile_insights(
         snapshots,
         active_profile_id=active_profile_id,
         goal_reached=goal_reached,
+        invezt_briefing=invezt_briefing,
     )
 
     try:

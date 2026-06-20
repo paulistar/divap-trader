@@ -129,12 +129,16 @@ def build_profiles_payload() -> dict:
     market = build_market_overview()
     snapshots = assess_all_profiles(market, settings.active_profile_ids)
     performance = {p["profile_id"]: p for p in build_profile_performance()}
+    from src.invezt.store import get_dashboard_payload
+
+    invezt_briefing = get_dashboard_payload()
     return {
         "active_profile_id": settings.active_profile_id,
         "active_profile_ids": list(settings.active_profile_ids),
         "goal_reached": settings.goal_reached_at is not None,
         "performance": list(performance.values()),
         "history": build_profile_history(),
+        "invezt_briefing": invezt_briefing,
         "profiles": [
             {
                 "id": snap.profile.id,
@@ -155,15 +159,18 @@ def build_profiles_payload() -> dict:
 
 
 def build_profile_insights_payload() -> dict[str, str]:
+    from src.invezt.store import get_dashboard_payload
     from src.profiles.llm_insights import generate_profile_insights
 
     repo = BankrollRepository()
     settings = repo.get_settings()
     market = build_market_overview()
     snapshots = assess_all_profiles(market, settings.active_profile_ids)
+    invezt = get_dashboard_payload()
     return generate_profile_insights(
         market,
         snapshots,
         active_profile_id=settings.active_profile_id,
         goal_reached=settings.goal_reached_at is not None,
+        invezt_briefing=invezt,
     )

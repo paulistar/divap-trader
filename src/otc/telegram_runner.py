@@ -17,11 +17,12 @@ logger = logging.getLogger(__name__)
 
 def run_forever() -> None:
     logging.basicConfig(level=settings.log_level.upper())
+    from src.invezt.config import configured as invezt_configured
     from src.tasso.config import configured as tasso_configured
 
     cfg = load_otc_config()
-    if not cfg.telegram.enabled and not tasso_configured():
-        logger.error("Nenhum listener Telegram habilitado (OTC ou Tasso)")
+    if not cfg.telegram.enabled and not tasso_configured() and not invezt_configured():
+        logger.error("Nenhum listener Telegram habilitado (OTC, Tasso ou Invezt)")
         sys.exit(1)
 
     mode = cfg.telegram.mode.strip().lower() if cfg.telegram.enabled else "user"

@@ -670,6 +670,52 @@ function profileLabel(id) {
   return id || "—";
 }
 
+function renderInveztBriefing(payload) {
+  const card = document.getElementById("invezt-briefing-card");
+  if (!card) return;
+  const briefing = payload?.invezt_briefing;
+  const latest = briefing?.latest;
+  if (!latest) {
+    card.classList.add("hidden");
+    card.innerHTML = "";
+    return;
+  }
+  card.classList.remove("hidden");
+  const kindLabel = {
+    crypto: "Cripto",
+    forex: "Forex",
+    closing: "Fechamento",
+    unknown: "Geral",
+  }[latest.kind] || "Briefing";
+  const received = latest.received_at
+    ? new Date(latest.received_at).toLocaleString("pt-BR")
+    : "—";
+  const crypto = latest.crypto_picks || [];
+  const forex = latest.forex_picks || [];
+  const biasClass = (b) => (b === "bullish" ? "bias-bullish" : b === "bearish" ? "dir-sell" : "bias-neutral");
+  const cryptoHtml = crypto.length
+    ? `<ul class="invezt-picks">${crypto.map((p) =>
+        `<li><span class="${biasClass(p.bias)}">${p.symbol}</span> · ${p.bias || "watch"}</li>`,
+      ).join("")}</ul>`
+    : '<p class="invezt-empty">Sem picks cripto neste briefing.</p>';
+  const forexHtml = forex.length
+    ? `<ul class="invezt-picks">${forex.map((p) =>
+        `<li><span class="${p.direction === "buy" ? "dir-buy" : "dir-sell"}">${p.pair}</span> · ${p.direction === "buy" ? "compra" : "venda"}</li>`,
+      ).join("")}</ul>`
+    : '<p class="invezt-empty">Sem pares forex neste briefing.</p>';
+  const summary = latest.strategic_summary || latest.headline || "";
+  card.innerHTML = `
+    <div class="invezt-header">
+      <div class="invezt-title">Maia / Invezt PREMIUM — ${kindLabel}</div>
+      <div class="invezt-meta">Recebido: ${received}</div>
+    </div>
+    <div class="invezt-headline">${(latest.title || "").replace(/</g, "&lt;")}${summary ? `<br>${summary.replace(/</g, "&lt;")}` : ""}</div>
+    <div class="invezt-columns">
+      <div class="invezt-col"><h4>Cripto</h4>${cryptoHtml}</div>
+      <div class="invezt-col"><h4>Forex</h4>${forexHtml}</div>
+    </div>`;
+}
+
 function renderProfiles(data, insightsMap) {
   const profiles = data?.profiles || [];
   const grid = document.getElementById("profiles-grid");
@@ -801,6 +847,7 @@ function renderBankroll(bankroll, profilesPayload) {
   `;
 
   if (profilesPayload?.profiles) renderProfiles(profilesPayload, null);
+  renderInveztBriefing(profilesPayload);
   if (profilesPayload) {
     renderProfilePerformance(profilesPayload);
     renderProfileHistory(profilesPayload);

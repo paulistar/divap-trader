@@ -46,6 +46,9 @@ x-shared-env: &shared-env
   # Tasso — Financial Move Bot 3.0 (Binance)
   TASSO_TELEGRAM_ENABLED: ${TASSO_TELEGRAM_ENABLED:-false}
   TASSO_FINANCIAL_MOVE_BOT: ${TASSO_FINANCIAL_MOVE_BOT:-FinancialMoveBot}
+  # Invezt — Maia PREMIUM (briefing perfis Binance)
+  INVEZT_TELEGRAM_ENABLED: ${INVEZT_TELEGRAM_ENABLED:-false}
+  INVEZT_TELEGRAM_CHAT_REF: ${INVEZT_TELEGRAM_CHAT_REF:--1002515846658}
 
 services:
   app:

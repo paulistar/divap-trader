@@ -28,6 +28,8 @@ def assess_profile(
     market: dict,
     *,
     active_profile_ids: tuple[str, ...] | list[str],
+    invezt_note: str | None = None,
+    invezt_score_delta: int = 0,
 ) -> ProfileAssessment:
     rules = profile.advisor
     score = 50
@@ -87,9 +89,12 @@ def assess_profile(
             score -= 10
             notes.append("Sentimento neutro — pouco edge contrarian")
 
-    score = max(0, min(100, score))
+    score = max(0, min(100, score + invezt_score_delta))
     status = _status_from_score(score)
-    detail = ". ".join(notes) if notes else profile.description
+    detail_parts = list(notes)
+    if invezt_note:
+        detail_parts.append(invezt_note)
+    detail = ". ".join(detail_parts) if detail_parts else profile.description
 
     return ProfileAssessment(
         profile_id=profile.id,
@@ -104,10 +109,19 @@ def assess_profile(
 def assess_all_profiles(
     market: dict, active_profile_ids: tuple[str, ...] | list[str]
 ) -> list[ProfileSnapshot]:
+    from src.invezt.advisor import invezt_note_for_profile, invezt_score_adjustment
+    from src.invezt.store import briefing_for_advisor
     from src.profiles.loader import load_binance_profiles
 
+    briefing = briefing_for_advisor()
     snapshots: list[ProfileSnapshot] = []
     for profile in load_binance_profiles():
-        assessment = assess_profile(profile, market, active_profile_ids=active_profile_ids)
+        assessment = assess_profile(
+            profile,
+            market,
+            active_profile_ids=active_profile_ids,
+            invezt_note=invezt_note_for_profile(profile, briefing),
+            invezt_score_delta=invezt_score_adjustment(profile, briefing),
+        )
         snapshots.append(ProfileSnapshot(profile=profile, assessment=assessment))
     return snapshots

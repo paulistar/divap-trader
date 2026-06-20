@@ -79,6 +79,13 @@ class Settings(BaseSettings):
         description="Username do Financial Move Bot 3.0 (ex: FinancialMoveBot ou @FinancialMoveBot)",
     )
 
+    invezt_telegram_enabled: bool = Field(default=False, alias="INVEZT_TELEGRAM_ENABLED")
+    invezt_telegram_chat_ref: str = Field(
+        default="",
+        alias="INVEZT_TELEGRAM_CHAT_REF",
+        description="Canal Maia/Invezt: @username, ID numérico ou vazio para busca automática",
+    )
+
     @field_validator("vapid_private_key", mode="before")
     @classmethod
     def normalize_vapid_private_key(cls, value: object) -> object:
@@ -99,6 +106,7 @@ class Settings(BaseSettings):
         "telegram_api_hash",
         "telegram_user_session",
         "tasso_financial_move_bot",
+        "invezt_telegram_chat_ref",
         mode="before",
     )
     @classmethod

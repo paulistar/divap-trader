@@ -50,22 +50,22 @@ async def _resolve_telethon_entity(client, source_chat: str):
 
 
 def user_listener_configured() -> bool:
+    from src.invezt.config import configured as invezt_configured
     from src.tasso.config import configured as tasso_configured
 
-    if tasso_configured():
-        if (
-            settings.telegram_api_id
-            and settings.telegram_api_hash.strip()
-            and settings.telegram_user_session.strip()
-        ):
-            return True
+    telethon_ready = (
+        settings.telegram_api_id
+        and settings.telegram_api_hash.strip()
+        and settings.telegram_user_session.strip()
+    )
+    if not telethon_ready:
+        return False
+
+    if tasso_configured() or invezt_configured():
+        return True
 
     cfg = load_otc_config()
     if not cfg.telegram.enabled or cfg.telegram.mode != "user":
-        return False
-    if not settings.telegram_api_id or not settings.telegram_api_hash.strip():
-        return False
-    if not settings.telegram_user_session.strip():
         return False
     return bool(resolve_otc_telegram_chat_id(cfg).strip())
 
@@ -74,6 +74,7 @@ async def run_user_listener_async() -> None:
     from telethon import TelegramClient, events
     from telethon.sessions import StringSession
 
+    from src.invezt.telegram_handler import register_invezt_handlers
     from src.tasso.telegram_handler import register_tasso_handlers
 
     cfg = load_otc_config()
@@ -129,6 +130,7 @@ async def run_user_listener_async() -> None:
                 logger.info("OTC Telethon dispatch: %s", outcome)
 
     await register_tasso_handlers(client)
+    await register_invezt_handlers(client)
 
     heartbeat_task = asyncio.create_task(_heartbeat_loop(client))
     try:
@@ -139,16 +141,17 @@ async def run_user_listener_async() -> None:
 
 def run_forever() -> None:
     logging.basicConfig(level=settings.log_level.upper())
+    from src.invezt.config import configured as invezt_configured
     from src.tasso.config import configured as tasso_configured
 
     cfg = load_otc_config()
-    if not cfg.telegram.enabled and not tasso_configured():
-        logger.error("Nenhum listener Telegram habilitado (OTC ou Tasso)")
+    if not cfg.telegram.enabled and not tasso_configured() and not invezt_configured():
+        logger.error("Nenhum listener Telegram habilitado (OTC, Tasso ou Invezt)")
         sys.exit(1)
     if not user_listener_configured():
         logger.error(
             "Modo user: configure TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_USER_SESSION "
-            "e OTC_TELEGRAM_CHAT_ID ou TASSO_TELEGRAM_ENABLED + TASSO_FINANCIAL_MOVE_BOT"
+            "e OTC_TELEGRAM_CHAT_ID ou TASSO_TELEGRAM_ENABLED ou INVEZT_TELEGRAM_ENABLED"
         )
         sys.exit(1)
     asyncio.run(run_user_listener_async())
