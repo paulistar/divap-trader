@@ -393,9 +393,23 @@ function renderBadges(health, stats, scan, bankroll) {
   el.innerHTML = `
     <span class="badge ${online ? "ok" : "off"}">${online ? "● Online" : "○ Offline"}</span>
     <span class="badge ${testnet ? "warn" : ""}">${testnet ? "Testnet" : stats?.trading_mode || "—"}</span>
-    <span class="badge ${trading ? "ok" : "off"}">Trading ${trading ? "ON" : "OFF"}</span>
+    <span class="badge ${trading ? "ok" : "off"}" title="TRADING_ENABLED — execução automática DIVAP na Binance">Binance ${trading ? "ON" : "OFF"}</span>
     <span class="badge ${beat ? "ok beat-pulse" : "off"}" title="${beatTitle.replace(/"/g, "&quot;")}">${beat ? "● Beat ativo" : "○ Beat inativo"}</span>
     ${protectedMode ? '<span class="badge warn">🛡 Protegido</span>' : ""}
+  `;
+}
+
+function renderOtcBadges(overview) {
+  const el = document.getElementById("status-badges");
+  if (!el) return;
+  const d = overview || {};
+  const online = d.connection_ok;
+  const trading = d.otc_trading_enabled;
+  const mode = d.account_mode ? String(d.account_mode).toLowerCase() : "—";
+  el.innerHTML = `
+    <span class="badge ${online ? "ok" : "off"}">${online ? "● IQ conectado" : "○ IQ offline"}</span>
+    <span class="badge warn">${mode}</span>
+    <span class="badge ${trading ? "ok" : "off"}" title="OTC_TRADING_ENABLED — sinais Telegram IQ Option">IQ Option ${trading ? "ON" : "OFF"}</span>
   `;
 }
 
@@ -1217,6 +1231,7 @@ async function loadOtc() {
 }
 
 function renderOtc(d) {
+  renderOtcBadges(d);
   renderOtcStatusLine(d);
   renderOtcStopBanner(d);
   renderOtcBalance(d);
