@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     telegram_api_hash: str = Field(default="", alias="TELEGRAM_API_HASH")
     telegram_user_session: str = Field(default="", alias="TELEGRAM_USER_SESSION")
 
+    tasso_telegram_enabled: bool = Field(default=False, alias="TASSO_TELEGRAM_ENABLED")
+    tasso_financial_move_bot: str = Field(
+        default="FinancialMoveBot",
+        alias="TASSO_FINANCIAL_MOVE_BOT",
+        description="Username do Financial Move Bot 3.0 (ex: FinancialMoveBot ou @FinancialMoveBot)",
+    )
+
     @field_validator("vapid_private_key", mode="before")
     @classmethod
     def normalize_vapid_private_key(cls, value: object) -> object:
@@ -91,6 +98,7 @@ class Settings(BaseSettings):
         "iqoption_mcp_url",
         "telegram_api_hash",
         "telegram_user_session",
+        "tasso_financial_move_bot",
         mode="before",
     )
     @classmethod

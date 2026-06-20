@@ -39,7 +39,7 @@ def get_active_scan_plans() -> tuple[ScanPlan, ...]:
         profile = load_profile(profile_id)
         if profile is None:
             continue
-        if not profile.scan.enabled or profile.kind == "otc":
+        if not profile.scan.enabled or profile.kind in ("otc", "tasso"):
             continue
         plans.append(
             ScanPlan(
@@ -60,7 +60,7 @@ def get_active_scan_plan() -> ScanPlan:
     repo = BankrollRepository()
     settings = repo.get_settings()
     profile = load_profile(settings.active_profile_id) or load_profile("divap")
-    if profile is None or not profile.scan.enabled or profile.kind == "otc":
+    if profile is None or not profile.scan.enabled or profile.kind in ("otc", "tasso"):
         profile = load_profile("divap")
     if profile is None:
         return ScanPlan(

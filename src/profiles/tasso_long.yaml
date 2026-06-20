@@ -1,0 +1,40 @@
+id: tasso_long
+name: Tasso Long
+kind: tasso
+tagline: Financial Move — posição longa
+description: >
+  Sinais do Financial Move Bot 3.0 com ativo em formato "INJUSDT (LONG)".
+  Copia entrada, stop e alvo do bot — sem timeframe fixo.
+  Execução automática na Binance (testnet/live conforme ambiente).
+execution:
+  min_confidence: medium
+  block_on_reject: false
+  min_risk_reward: "1.0"
+  max_open_trades: 3
+  allowed_timeframes: ["1m", "5m", "15m", "1h", "4h", "1d", "external"]
+  allocation_multiplier: "0.75"
+advisor:
+  ideal_fear_greed_min: 0
+  ideal_fear_greed_max: 100
+  preferred_verdicts: ["confirm", "caution", "reject"]
+  min_avg_score: 0
+  volatility: medium
+  needs_momentum: false
+scan:
+  enabled: false
+  interval_seconds: 0
+  timeframes: []
+  symbols: []
+  monitor_interval_seconds: 300
+exit:
+  take_profit_fibo: null
+  time_stop_candles: 0
+  time_stop_min_move_pct: "0"
+  time_stop_timeframes: []
+tasso:
+  variant: long
+  trigger_pattern: "(LONG)"
+  telegram:
+    accept_button_text: "Aceitar"
+    detail_button_text: "Solicitar detalhes do trade no bot"
+    detail_button_index: 0

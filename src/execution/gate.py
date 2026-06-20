@@ -38,6 +38,9 @@ def should_execute_trade(
         _, profile_exec, meta = get_active_execution_profile()
         goal_protected = meta.get("protected_mode", False)
 
+    if profile is not None and profile.kind == "tasso":
+        return True, "ok"
+
     min_conf = profile_exec.min_confidence.lower()
     if min_conf == "high" and signal.confidence != "high":
         return False, "confidence_below_threshold"

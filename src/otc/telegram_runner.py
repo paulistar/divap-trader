@@ -17,12 +17,14 @@ logger = logging.getLogger(__name__)
 
 def run_forever() -> None:
     logging.basicConfig(level=settings.log_level.upper())
+    from src.tasso.config import configured as tasso_configured
+
     cfg = load_otc_config()
-    if not cfg.telegram.enabled:
-        logger.error("otc.telegram.enabled=false — listener não iniciado")
+    if not cfg.telegram.enabled and not tasso_configured():
+        logger.error("Nenhum listener Telegram habilitado (OTC ou Tasso)")
         sys.exit(1)
 
-    mode = cfg.telegram.mode.strip().lower()
+    mode = cfg.telegram.mode.strip().lower() if cfg.telegram.enabled else "user"
     if mode == "user":
         if user_listener_configured():
             run_user_listener()
@@ -32,6 +34,10 @@ def run_forever() -> None:
 
     if mode == "bot" and bot_listener_configured():
         run_bot_listener()
+        return
+
+    if tasso_configured() and user_listener_configured():
+        run_user_listener()
         return
 
     logger.error("Listener Telegram não configurado (mode=%s)", mode)

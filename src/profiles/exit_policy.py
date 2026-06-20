@@ -141,8 +141,10 @@ def partial_close_quantity(
 ) -> Decimal:
     if partials_taken >= total_partials - 1:
         return remaining_quantity
-    third = (original_quantity / Decimal(3)).quantize(_QTY_PRECISION, rounding=ROUND_DOWN)
-    return min(third, remaining_quantity)
+    per_level = (original_quantity / Decimal(total_partials)).quantize(
+        _QTY_PRECISION, rounding=ROUND_DOWN
+    )
+    return min(per_level, remaining_quantity)
 
 
 def exit_rules_for_profile(profile_id: str | None) -> ProfileExit:

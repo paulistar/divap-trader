@@ -66,6 +66,7 @@ class TradeExecutor:
         alert_id: int,
         market_context: MarketContext | None,
         profile_id: str | None = None,
+        take_profit_levels: tuple[Decimal, ...] | None = None,
     ) -> TradeExecutionResult:
         effective_profile_id = profile_id or get_execution_context()[0]
         profile, execution, meta = get_execution_profile_for(effective_profile_id)
@@ -172,6 +173,7 @@ class TradeExecutor:
                 effective_profile_id,
                 goal_protected,
                 execution,
+                take_profit_levels=take_profit_levels,
             )
         except ExchangeError as exc:
             logger.error("Trade execution failed %s: %s", signal.symbol, exc)
@@ -206,6 +208,7 @@ class TradeExecutor:
         profile_id: str,
         goal_protected: bool,
         execution: ProfileExecution,
+        take_profit_levels: tuple[Decimal, ...] | None = None,
     ) -> TradeExecutionResult:
         if signal.direction == "buy":
             return self._execute_buy(
@@ -216,6 +219,7 @@ class TradeExecutor:
                 profile_id,
                 goal_protected,
                 execution,
+                take_profit_levels=take_profit_levels,
             )
         return self._execute_sell(
             signal,
@@ -225,6 +229,7 @@ class TradeExecutor:
             profile_id,
             goal_protected,
             execution,
+            take_profit_levels=take_profit_levels,
         )
 
     def _execute_buy(
@@ -236,6 +241,7 @@ class TradeExecutor:
         profile_id: str,
         goal_protected: bool,
         execution: ProfileExecution,
+        take_profit_levels: tuple[Decimal, ...] | None = None,
     ) -> TradeExecutionResult:
         usdt = self._broker.get_usdt_balance()
         quote = self._resolve_quote_amount(signal, execution)
@@ -269,9 +275,11 @@ class TradeExecutor:
         )
 
         profile = load_profile(profile_id)
-        tp_levels: tuple[Decimal, ...] | None = None
+        tp_levels: tuple[Decimal, ...] | None = take_profit_levels
         tp_order = None
-        if profile is not None and uses_partial_take_profits(profile):
+        if tp_levels:
+            take_profit = tp_levels[-1]
+        elif profile is not None and uses_partial_take_profits(profile):
             tp_levels = compute_partial_take_profit_levels(
                 entry_price,
                 take_profit,
@@ -333,6 +341,7 @@ class TradeExecutor:
         profile_id: str,
         goal_protected: bool,
         execution: ProfileExecution,
+        take_profit_levels: tuple[Decimal, ...] | None = None,
     ) -> TradeExecutionResult:
         quote_equiv = self._resolve_quote_amount(signal, execution)
         quantity = base_quantity_from_quote(quote_equiv, signal.entry_price)
