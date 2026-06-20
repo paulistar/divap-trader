@@ -701,6 +701,17 @@ body[data-view="settings"] #settings-section { display: block; }
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+.settings-actions {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+.settings-actions .subtitle {
+  flex: 1 1 100%;
+  margin: 0.35rem 0 0;
+}
 .currency-btn {
   background: transparent;
   border: none;

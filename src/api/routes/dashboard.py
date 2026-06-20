@@ -43,7 +43,7 @@ from src.execution.binance_broker import BinanceBroker
 from src.core.exceptions import ExchangeError
 from src.trading.trade_enrichment import enrich_trade_for_dashboard
 from src.api.schemas import ApiResponse, HealthData
-from src.core.config import settings
+from src.core.config import Settings, settings
 from src.data.repositories.alert_repo import AlertRepository
 from src.data.repositories.trade_repo import TradeRepository
 from src.trading.readiness import build_trading_readiness
@@ -106,6 +106,75 @@ class DashboardSettingsBody(BaseModel):
     context_enabled: bool | None = None
     context_news_limit: int | None = Field(default=None, ge=1, le=50)
     otc_telegram_chat_id: str | None = None
+
+
+def _apply_dashboard_settings_body(cfg: Settings, body: DashboardSettingsBody) -> Settings:
+    """Retorna cópia de cfg com overrides do painel (imutável em relação ao singleton)."""
+    updates: dict[str, object] = {}
+    if body.binance_trading_enabled is not None:
+        updates["trading_enabled"] = bool(body.binance_trading_enabled)
+    if body.otc_trading_enabled is not None:
+        updates["otc_trading_enabled"] = bool(body.otc_trading_enabled)
+    if body.trading_mode is not None:
+        updates["trading_mode"] = body.trading_mode
+    if body.binance_use_testnet is not None:
+        updates["binance_use_testnet"] = bool(body.binance_use_testnet)
+    if body.trading_min_confidence is not None:
+        updates["trading_min_confidence"] = body.trading_min_confidence
+    if body.trading_block_on_context_reject is not None:
+        updates["trading_block_on_context_reject"] = bool(body.trading_block_on_context_reject)
+    if body.trading_max_open_trades is not None:
+        updates["trading_max_open_trades"] = int(body.trading_max_open_trades)
+    if body.trading_dry_run is not None:
+        updates["trading_dry_run"] = bool(body.trading_dry_run)
+    if body.context_enabled is not None:
+        updates["context_enabled"] = bool(body.context_enabled)
+    if body.context_news_limit is not None:
+        updates["context_news_limit"] = int(body.context_news_limit)
+    if body.otc_telegram_chat_id is not None:
+        updates["otc_telegram_chat_id"] = body.otc_telegram_chat_id.strip()
+    if not updates:
+        return cfg
+    return cfg.model_copy(update=updates)
+
+
+def _dashboard_settings_secrets_payload() -> dict[str, bool]:
+    return {
+        "binance_api_key_configured": bool(settings.binance_api_key),
+        "binance_api_secret_configured": bool(settings.binance_api_secret),
+        "iqoption_mcp_token_configured": bool(settings.iqoption_mcp_token),
+        "iqoption_login_configured": bool(
+            settings.iqoption_email and settings.iqoption_password
+        ),
+        "telegram_bot_token_configured": bool(settings.telegram_bot_token),
+    }
+
+
+def _build_dashboard_settings_payload(cfg: Settings | None = None) -> dict:
+    from src.api.dashboard_env_export import build_env_export
+    from src.otc.service import build_otc_status
+
+    active = cfg or settings
+    return {
+        "binance": {
+            "trading_enabled": active.trading_enabled,
+            "trading_mode": active.trading_mode,
+            "use_testnet": active.binance_use_testnet,
+            "min_confidence": active.trading_min_confidence,
+            "block_on_reject": active.trading_block_on_context_reject,
+            "max_open_trades": active.trading_max_open_trades,
+            "dry_run": active.trading_dry_run,
+            "context_enabled": active.context_enabled,
+            "context_news_limit": active.context_news_limit,
+        },
+        "otc": {
+            "trading_enabled": active.otc_trading_enabled,
+            "telegram_chat_id": active.otc_telegram_chat_id,
+            "status": build_otc_status(),
+        },
+        "secrets": _dashboard_settings_secrets_payload(),
+        "env_export": build_env_export(active),
+    }
 
 
 async def require_dashboard_session(request: Request) -> None:
@@ -292,38 +361,7 @@ async def dashboard_settings(
     - Binance: TRADING_ENABLED / TRADING_MODE
     - IQ Option: OTC_TRADING_ENABLED
     """
-    from src.otc.service import build_otc_status
-
-    return ApiResponse(
-        success=True,
-        data={
-            "binance": {
-                "trading_enabled": settings.trading_enabled,
-                "trading_mode": settings.trading_mode,
-                "use_testnet": settings.binance_use_testnet,
-                "min_confidence": settings.trading_min_confidence,
-                "block_on_reject": settings.trading_block_on_context_reject,
-                "max_open_trades": settings.trading_max_open_trades,
-                "dry_run": settings.trading_dry_run,
-                "context_enabled": settings.context_enabled,
-                "context_news_limit": settings.context_news_limit,
-            },
-            "otc": {
-                "trading_enabled": settings.otc_trading_enabled,
-                "telegram_chat_id": settings.otc_telegram_chat_id,
-                "status": build_otc_status(),
-            },
-            "secrets": {
-                "binance_api_key_configured": bool(settings.binance_api_key),
-                "binance_api_secret_configured": bool(settings.binance_api_secret),
-                "iqoption_mcp_token_configured": bool(settings.iqoption_mcp_token),
-                "iqoption_login_configured": bool(
-                    settings.iqoption_email and settings.iqoption_password
-                ),
-                "telegram_bot_token_configured": bool(settings.telegram_bot_token),
-            },
-        },
-    )
+    return ApiResponse(success=True, data=_build_dashboard_settings_payload())
 
 
 @router.post("/dashboard/settings", include_in_schema=False)
@@ -358,38 +396,22 @@ async def dashboard_settings_update(
     if body.otc_telegram_chat_id is not None:
         settings.otc_telegram_chat_id = body.otc_telegram_chat_id.strip()
 
-    from src.otc.service import build_otc_status
+    return ApiResponse(success=True, data=_build_dashboard_settings_payload())
 
-    return ApiResponse(
-        success=True,
-        data={
-            "binance": {
-                "trading_enabled": settings.trading_enabled,
-                "trading_mode": settings.trading_mode,
-                "use_testnet": settings.binance_use_testnet,
-                "min_confidence": settings.trading_min_confidence,
-                "block_on_reject": settings.trading_block_on_context_reject,
-                "max_open_trades": settings.trading_max_open_trades,
-                "dry_run": settings.trading_dry_run,
-                "context_enabled": settings.context_enabled,
-                "context_news_limit": settings.context_news_limit,
-            },
-            "otc": {
-                "trading_enabled": settings.otc_trading_enabled,
-                "telegram_chat_id": settings.otc_telegram_chat_id,
-                "status": build_otc_status(),
-            },
-            "secrets": {
-                "binance_api_key_configured": bool(settings.binance_api_key),
-                "binance_api_secret_configured": bool(settings.binance_api_secret),
-                "iqoption_mcp_token_configured": bool(settings.iqoption_mcp_token),
-                "iqoption_login_configured": bool(
-                    settings.iqoption_email and settings.iqoption_password
-                ),
-                "telegram_bot_token_configured": bool(settings.telegram_bot_token),
-            },
-        },
-    )
+
+@router.post("/dashboard/settings/env-export", include_in_schema=False)
+async def dashboard_settings_env_export(
+    body: DashboardSettingsBody | None = None,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    """
+    Gera bloco .env para colar no Easypanel.
+    Com body opcional: reflete o formulário sem persistir alterações.
+    """
+    effective = _apply_dashboard_settings_body(settings, body) if body else settings
+    from src.api.dashboard_env_export import build_env_export
+
+    return ApiResponse(success=True, data={"env_export": build_env_export(effective)})
 
 
 @router.post("/dashboard/push/subscribe", include_in_schema=False)

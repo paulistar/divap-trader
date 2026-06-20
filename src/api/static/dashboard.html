@@ -397,9 +397,10 @@
           <div id="settings-secrets-status" class="subtitle" style="margin-top:0.6rem;"></div>
         </section>
       </div>
-      <div style="margin-top: 0.9rem;">
+      <div class="settings-actions">
         <button type="button" class="secondary" id="settings-save-btn">Salvar configurações</button>
-        <p class="subtitle">Obs.: alterações aqui valem imediatamente, mas não persistem no Easypanel após novo deploy.</p>
+        <button type="button" class="secondary" id="settings-copy-env-btn">Copiar bloco .env atualizado</button>
+        <p class="subtitle">Obs.: alterações aqui valem imediatamente, mas não persistem no Easypanel após novo deploy. Use «Copiar bloco .env» para colar no Environment do Easypanel (segredos não são exportados).</p>
       </div>
     </section>
 
@@ -411,6 +412,6 @@
   </div>
 
   <div id="modal-root"></div>
-  <script src="/dashboard/static/dashboard.js?v=14" defer></script>
+  <script src="/dashboard/static/dashboard.js?v=15" defer></script>
 </body>
 </html>

@@ -112,6 +112,36 @@ async function saveDashboardSettings(payload) {
   return body.data || {};
 }
 
+function buildDashboardSettingsPayloadFromForm() {
+  const binToggle = document.getElementById("binance-trading-toggle");
+  const otcToggle = document.getElementById("otc-trading-toggle");
+  return {
+    binance_trading_enabled: binToggle ? !!binToggle.checked : undefined,
+    otc_trading_enabled: otcToggle ? !!otcToggle.checked : undefined,
+    trading_mode: getVal("settings-trading-mode"),
+    binance_use_testnet: getChecked("settings-binance-testnet"),
+    trading_min_confidence: getVal("settings-min-confidence"),
+    trading_block_on_context_reject: getChecked("settings-block-reject"),
+    trading_max_open_trades: Number(getVal("settings-max-open") || 5),
+    trading_dry_run: getChecked("settings-dry-run"),
+    context_enabled: getChecked("settings-context-enabled"),
+    context_news_limit: Number(getVal("settings-news-limit") || 5),
+    otc_telegram_chat_id: getVal("settings-otc-chat-id"),
+  };
+}
+
+async function fetchDashboardEnvExport(payload) {
+  const res = await fetch("/dashboard/settings/env-export", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {}),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Erro ${res.status}`);
+  return body.data?.env_export || "";
+}
+
 async function login(secret) {
   const res = await fetch("/dashboard/auth", {
     method: "POST",
@@ -544,21 +574,7 @@ async function loadDashboardSettings() {
 }
 
 async function saveDashboardSettingsFromForm() {
-  const binToggle = document.getElementById("binance-trading-toggle");
-  const otcToggle = document.getElementById("otc-trading-toggle");
-  const payload = {
-    binance_trading_enabled: binToggle ? !!binToggle.checked : undefined,
-    otc_trading_enabled: otcToggle ? !!otcToggle.checked : undefined,
-    trading_mode: getVal("settings-trading-mode"),
-    binance_use_testnet: getChecked("settings-binance-testnet"),
-    trading_min_confidence: getVal("settings-min-confidence"),
-    trading_block_on_context_reject: getChecked("settings-block-reject"),
-    trading_max_open_trades: Number(getVal("settings-max-open") || 5),
-    trading_dry_run: getChecked("settings-dry-run"),
-    context_enabled: getChecked("settings-context-enabled"),
-    context_news_limit: Number(getVal("settings-news-limit") || 5),
-    otc_telegram_chat_id: getVal("settings-otc-chat-id"),
-  };
+  const payload = buildDashboardSettingsPayloadFromForm();
   try {
     await saveDashboardSettings(payload);
     showSuccess("Configurações atualizadas (válidas até próximo deploy).");
@@ -569,6 +585,28 @@ async function saveDashboardSettingsFromForm() {
     }
   } catch (err) {
     showError(err.message || "Falha ao salvar configurações");
+  }
+}
+
+async function copyDashboardEnvBlock() {
+  const btn = document.getElementById("settings-copy-env-btn");
+  const payload = buildDashboardSettingsPayloadFromForm();
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Gerando…";
+    }
+    const text = await fetchDashboardEnvExport(payload);
+    if (!text) throw new Error("Exportação vazia");
+    await navigator.clipboard.writeText(text);
+    showSuccess("Bloco .env copiado — cole no Easypanel (Environment).");
+  } catch (err) {
+    showError(err.message || "Falha ao copiar bloco .env");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Copiar bloco .env atualizado";
+    }
   }
 }
 
@@ -1238,6 +1276,7 @@ document.getElementById("save-bankroll-btn")?.addEventListener("click", async ()
 });
 
 document.getElementById("settings-save-btn")?.addEventListener("click", saveDashboardSettingsFromForm);
+document.getElementById("settings-copy-env-btn")?.addEventListener("click", copyDashboardEnvBlock);
 
 /* ===================== IQ Option (OTC) ===================== */
 let otcOverview = null;
