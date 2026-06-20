@@ -620,6 +620,29 @@ async def dashboard_otc_pnl(
     return ApiResponse(success=True, data=build_otc_pnl(period, limit=safe_limit))
 
 
+@router.get("/dashboard/otc/usd-brl", include_in_schema=False)
+async def dashboard_otc_usd_brl(
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    """Cotação USD/BRL em tempo (quase) real para conversão no painel OTC."""
+    from src.api.fx_rate import fetch_usd_brl_rate
+    from src.core.exceptions import ExchangeError
+
+    try:
+        rate, source, fetched_at = await fetch_usd_brl_rate()
+    except ExchangeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return ApiResponse(
+        success=True,
+        data={
+            "rate": str(rate),
+            "source": source,
+            "fetched_at": fetched_at.isoformat(),
+        },
+    )
+
+
 @router.post("/dashboard/otc/settings", include_in_schema=False)
 async def dashboard_otc_settings(
     body: OtcSettingsBody,

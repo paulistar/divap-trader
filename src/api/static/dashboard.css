@@ -767,10 +767,29 @@ body[data-view="settings"] #settings-section { display: block; }
   padding: 1.1rem;
 }
 .otc-settings-form label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; color: var(--text-muted); }
-.otc-settings-form input[type="number"] {
+.otc-settings-form input[type="number"],
+.otc-settings-form input[type="text"].otc-money-input {
   background: var(--bg); color: var(--text);
   border: 1px solid var(--border); border-radius: 8px;
   padding: 0.5rem 0.6rem; font-size: 0.9rem;
 }
+.otc-settings-form input.otc-money-input.readonly {
+  opacity: 0.85;
+  cursor: default;
+}
+.otc-rate-label { grid-column: 1 / -1; }
+.otc-rate-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.otc-rate-row .otc-rate-input { flex: 1; min-width: 0; }
+.otc-rate-meta {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.otc-rate-auto { margin-top: 0.35rem; }
 .otc-settings-form .filter-inline { flex-direction: row; align-items: center; gap: 0.5rem; color: var(--text); }
 .otc-settings-form button[type="submit"] { grid-column: 1 / -1; justify-self: start; }

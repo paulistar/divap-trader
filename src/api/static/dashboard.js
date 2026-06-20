@@ -164,6 +164,41 @@ function fmtNum(val, digits = 2) {
   return n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
+function parseMoneyInput(raw) {
+  if (raw == null) return null;
+  let s = String(raw).trim();
+  if (!s) return null;
+  s = s.replace(/^(R\$|US\$|\$)\s*/i, "").replace(/[^\d.,-]/g, "");
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatMoneyInput(value, digits = 2) {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString("pt-BR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function bindOtcMoneyInputs() {
+  document.querySelectorAll(".otc-money-input").forEach((el) => {
+    if (el.dataset.moneyBound === "1") return;
+    el.dataset.moneyBound = "1";
+    const digits = Number(el.dataset.decimals || 2);
+    el.addEventListener("blur", () => {
+      if (el.readOnly) return;
+      const parsed = parseMoneyInput(el.value);
+      el.value = parsed == null ? "" : formatMoneyInput(parsed, digits);
+    });
+  });
+}
+
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -1281,7 +1316,9 @@ document.getElementById("settings-copy-env-btn")?.addEventListener("click", copy
 /* ===================== IQ Option (OTC) ===================== */
 let otcOverview = null;
 let otcPnlLoaded = false;
+let otcFxAutoTimer = null;
 const DEFAULT_USD_BRL = 5.4;
+const OTC_FX_REFRESH_MS = 10 * 60 * 1000;
 
 function getViewMode() {
   const mode = localStorage.getItem("divap_view");
@@ -1295,8 +1332,94 @@ function getOtcPeriod() {
   return localStorage.getItem("otc_period") || "day";
 }
 function otcRate() {
-  const r = Number(otcOverview?.usd_brl_rate);
-  return Number.isFinite(r) && r > 0 ? r : DEFAULT_USD_BRL;
+  const fromOverview = Number(otcOverview?.usd_brl_rate);
+  if (Number.isFinite(fromOverview) && fromOverview > 0) return fromOverview;
+  const fromInput = parseMoneyInput(document.getElementById("otc-usd-brl")?.value);
+  if (fromInput != null && fromInput > 0) return fromInput;
+  return DEFAULT_USD_BRL;
+}
+
+function isOtcFxAuto() {
+  return localStorage.getItem("otc_usd_brl_auto") !== "false";
+}
+
+function syncOtcFxAutoUi() {
+  const auto = isOtcFxAuto();
+  const input = document.getElementById("otc-usd-brl");
+  const refreshBtn = document.getElementById("otc-usd-brl-refresh");
+  const autoChk = document.getElementById("otc-usd-brl-auto");
+  if (autoChk) autoChk.checked = auto;
+  if (input) {
+    input.readOnly = auto;
+    input.classList.toggle("readonly", auto);
+  }
+  if (refreshBtn) refreshBtn.disabled = auto;
+}
+
+function updateOtcFxMeta(data) {
+  const meta = document.getElementById("otc-usd-brl-meta");
+  if (!meta) return;
+  const when = data?.fetched_at ? fmtDate(data.fetched_at) : "agora";
+  const source = data?.source || "salva";
+  meta.textContent = `Fonte: ${source} · ${when}${isOtcFxAuto() ? " · automático" : ""}`;
+}
+
+async function persistOtcUsdBrlRate(rate) {
+  const res = await fetch("/dashboard/otc/settings", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usd_brl_rate: rate }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || "Falha ao salvar cotação");
+  if (body.data) otcOverview = body.data;
+}
+
+async function fetchOtcUsdBrlRate({ persist = false, silent = false } = {}) {
+  const res = await fetch("/dashboard/otc/usd-brl", { credentials: "same-origin" });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || body.error || `Erro ${res.status}`);
+  const data = body.data || {};
+  const rate = parseMoneyInput(data.rate);
+  if (rate == null || rate <= 0) throw new Error("Cotação inválida");
+
+  if (otcOverview) otcOverview.usd_brl_rate = rate;
+  const input = document.getElementById("otc-usd-brl");
+  if (input && document.activeElement !== input) {
+    input.value = formatMoneyInput(rate, 4);
+  }
+  updateOtcFxMeta(data);
+
+  if (persist) {
+    await persistOtcUsdBrlRate(rate);
+  }
+
+  if (otcOverview && getOtcCurrency() === "brl") {
+    renderOtcBalance(otcOverview);
+    renderOtcGoals(otcOverview);
+    renderOtcStats(otcOverview);
+    renderOtcMartingale(otcOverview);
+    renderOtcPeriodTotals(otcOverview);
+    renderOtcTrades(otcOverview.trades);
+    loadOtcPnl();
+  }
+  return rate;
+}
+
+function stopOtcFxAutoRefresh() {
+  if (otcFxAutoTimer) clearInterval(otcFxAutoTimer);
+  otcFxAutoTimer = null;
+}
+
+function startOtcFxAutoRefresh() {
+  stopOtcFxAutoRefresh();
+  if (!isOtcFxAuto()) return;
+  otcFxAutoTimer = setInterval(() => {
+    if (getViewMode() === "otc") {
+      fetchOtcUsdBrlRate({ persist: true, silent: true }).catch(() => {});
+    }
+  }, OTC_FX_REFRESH_MS);
 }
 
 function otcMoney(usd, { sign = false } = {}) {
@@ -1372,6 +1495,19 @@ async function loadOtc() {
   try {
     otcOverview = await fetchOtcOverview();
     renderOtc(otcOverview);
+    syncOtcFxAutoUi();
+    bindOtcMoneyInputs();
+    if (isOtcFxAuto()) {
+      try {
+        await fetchOtcUsdBrlRate({ persist: true, silent: true });
+      } catch (_) {
+        updateOtcFxMeta({ source: "salva", fetched_at: null });
+      }
+      startOtcFxAutoRefresh();
+    } else {
+      stopOtcFxAutoRefresh();
+      updateOtcFxMeta({ source: "manual", fetched_at: null });
+    }
     await loadOtcPnl();
     document.getElementById("footer-updated").textContent =
       "Atualizado: " + new Date().toLocaleString("pt-BR");
@@ -1538,6 +1674,12 @@ function renderOtcTrades(trades) {
 
 function fillOtcSettingsForm(s) {
   if (!s) return;
+  const setMoney = (id, v, digits = 2) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) {
+      el.value = v != null && v !== "" ? formatMoneyInput(v, digits) : "";
+    }
+  };
   const setVal = (id, v) => {
     const el = document.getElementById(id);
     if (el && document.activeElement !== el) el.value = v != null ? v : "";
@@ -1546,12 +1688,14 @@ function fillOtcSettingsForm(s) {
     const el = document.getElementById(id);
     if (el) el.checked = !!v;
   };
-  setVal("otc-stake", s.stake_usd);
-  setVal("otc-bankroll", s.initial_bankroll_usd);
-  setVal("otc-daily-goal", s.daily_goal_usd);
-  setVal("otc-monthly-goal", s.monthly_goal_usd);
+  setMoney("otc-stake", s.stake_usd);
+  setMoney("otc-bankroll", s.initial_bankroll_usd);
+  setMoney("otc-daily-goal", s.daily_goal_usd);
+  setMoney("otc-monthly-goal", s.monthly_goal_usd);
   setVal("otc-stop-loss-pct", s.daily_stop_loss_pct);
-  setVal("otc-usd-brl", s.usd_brl_rate);
+  if (!isOtcFxAuto() || document.activeElement?.id !== "otc-usd-brl") {
+    setMoney("otc-usd-brl", s.usd_brl_rate, 4);
+  }
   setChk("otc-stop-win-enabled", s.stop_win_enabled);
   setChk("otc-stop-loss-enabled", s.stop_loss_enabled);
 }
@@ -1656,7 +1800,8 @@ document.getElementById("otc-period-select")?.addEventListener("change", (e) => 
 
 document.getElementById("otc-settings-form")?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const numOrNull = (id) => {
+  const numOrNull = (id) => parseMoneyInput(document.getElementById(id)?.value);
+  const pctOrNull = (id) => {
     const v = document.getElementById(id)?.value;
     return v === "" || v == null ? null : Number(v);
   };
@@ -1665,7 +1810,7 @@ document.getElementById("otc-settings-form")?.addEventListener("submit", async (
     initial_bankroll_usd: numOrNull("otc-bankroll"),
     daily_goal_usd: numOrNull("otc-daily-goal"),
     monthly_goal_usd: numOrNull("otc-monthly-goal"),
-    daily_stop_loss_pct: numOrNull("otc-stop-loss-pct"),
+    daily_stop_loss_pct: pctOrNull("otc-stop-loss-pct"),
     usd_brl_rate: numOrNull("otc-usd-brl"),
     stop_win_enabled: document.getElementById("otc-stop-win-enabled")?.checked || false,
     stop_loss_enabled: document.getElementById("otc-stop-loss-enabled")?.checked || false,
@@ -1691,6 +1836,42 @@ document.getElementById("otc-settings-form")?.addEventListener("submit", async (
   }
 });
 
+document.getElementById("otc-usd-brl-refresh")?.addEventListener("click", async () => {
+  const btn = document.getElementById("otc-usd-brl-refresh");
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Atualizando…";
+    }
+    await fetchOtcUsdBrlRate({ persist: true });
+    showSuccess("Cotação USD/BRL atualizada");
+  } catch (err) {
+    showError(err.message || "Falha ao atualizar cotação");
+  } finally {
+    if (btn) {
+      btn.disabled = isOtcFxAuto();
+      btn.textContent = "Atualizar";
+    }
+  }
+});
+
+document.getElementById("otc-usd-brl-auto")?.addEventListener("change", async (e) => {
+  const auto = !!e.target.checked;
+  localStorage.setItem("otc_usd_brl_auto", auto ? "true" : "false");
+  syncOtcFxAutoUi();
+  if (auto) {
+    try {
+      await fetchOtcUsdBrlRate({ persist: true, silent: true });
+    } catch (_) {
+      updateOtcFxMeta({ source: "salva", fetched_at: null });
+    }
+    startOtcFxAutoRefresh();
+  } else {
+    stopOtcFxAutoRefresh();
+    updateOtcFxMeta({ source: "manual", fetched_at: null });
+  }
+});
+
 // Sincroniza botão de moeda com a preferência salva
 document.querySelectorAll(".currency-btn").forEach((b) => {
   b.classList.toggle("active", b.dataset.currency === getOtcCurrency());
@@ -1698,6 +1879,8 @@ document.querySelectorAll(".currency-btn").forEach((b) => {
 
 bindTableClicks();
 registerPwa();
+bindOtcMoneyInputs();
+syncOtcFxAutoUi();
 
 async function bootstrap() {
   try {

@@ -275,22 +275,29 @@
         <h3 class="otc-h">Gestão de banca & metas</h3>
         <form id="otc-settings-form" class="otc-settings-form">
           <label>Valor da entrada (US$)
-            <input type="number" id="otc-stake" min="0" step="1" placeholder="Ex: 5" />
+            <input type="text" inputmode="decimal" id="otc-stake" class="otc-money-input" placeholder="Ex: 5,00" />
           </label>
           <label>Banca inicial (US$)
-            <input type="number" id="otc-bankroll" min="0" step="10" placeholder="Ex: 1000" />
+            <input type="text" inputmode="decimal" id="otc-bankroll" class="otc-money-input" placeholder="Ex: 8.306,76" />
           </label>
           <label>Meta diária (US$)
-            <input type="number" id="otc-daily-goal" min="0" step="5" placeholder="Ex: 50" />
+            <input type="text" inputmode="decimal" id="otc-daily-goal" class="otc-money-input" placeholder="Ex: 50,00" />
           </label>
           <label>Meta mensal (US$)
-            <input type="number" id="otc-monthly-goal" min="0" step="50" placeholder="Ex: 800" />
+            <input type="text" inputmode="decimal" id="otc-monthly-goal" class="otc-money-input" placeholder="Ex: 800,00" />
           </label>
           <label>Stop loss diário (% da banca)
             <input type="number" id="otc-stop-loss-pct" min="0" max="100" step="1" placeholder="Ex: 20" />
           </label>
-          <label>Cotação US$ → R$
-            <input type="number" id="otc-usd-brl" min="0" step="0.01" placeholder="Ex: 5.40" />
+          <label class="otc-rate-label">Cotação US$ → R$
+            <div class="otc-rate-row">
+              <input type="text" inputmode="decimal" id="otc-usd-brl" class="otc-money-input otc-rate-input" data-decimals="4" placeholder="Ex: 5,4321" />
+              <button type="button" class="secondary" id="otc-usd-brl-refresh">Atualizar</button>
+            </div>
+            <span class="otc-rate-meta" id="otc-usd-brl-meta">—</span>
+            <label class="filter-inline otc-rate-auto">
+              <input type="checkbox" id="otc-usd-brl-auto" checked /> Atualizar cotação automaticamente
+            </label>
           </label>
           <label class="filter-inline">
             <input type="checkbox" id="otc-stop-win-enabled" /> Stop win (pausar ao bater meta do dia)
@@ -412,6 +419,6 @@
   </div>
 
   <div id="modal-root"></div>
-  <script src="/dashboard/static/dashboard.js?v=15" defer></script>
+  <script src="/dashboard/static/dashboard.js?v=16" defer></script>
 </body>
 </html>
