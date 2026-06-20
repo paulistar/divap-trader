@@ -672,6 +672,22 @@ body[data-view="settings"] #settings-section { display: block; }
   margin: 0 0 0.4rem;
   font-size: 0.95rem;
 }
+.settings-card label {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.settings-card input,
+.settings-card select {
+  margin-top: 0.25rem;
+  width: 100%;
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+}
 .toggle-row {
   margin-top: 0.75rem;
   display: flex;

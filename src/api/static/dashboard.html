@@ -336,6 +336,33 @@
             </span>
             <input type="checkbox" id="binance-trading-toggle" />
           </label>
+          <label>Modo
+            <select id="settings-trading-mode">
+              <option value="testnet">testnet</option>
+              <option value="live">live</option>
+            </select>
+          </label>
+          <label class="toggle-row">
+            <span>Binance testnet <span class="hint">BINANCE_USE_TESTNET</span></span>
+            <input type="checkbox" id="settings-binance-testnet" />
+          </label>
+          <label>Confiança mínima
+            <select id="settings-min-confidence">
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+            </select>
+          </label>
+          <label class="toggle-row">
+            <span>Bloquear em reject <span class="hint">TRADING_BLOCK_ON_CONTEXT_REJECT</span></span>
+            <input type="checkbox" id="settings-block-reject" />
+          </label>
+          <label>Máx. trades abertos
+            <input type="number" id="settings-max-open" min="1" max="50" step="1" />
+          </label>
+          <label class="toggle-row">
+            <span>Dry-run <span class="hint">TRADING_DRY_RUN</span></span>
+            <input type="checkbox" id="settings-dry-run" />
+          </label>
         </section>
 
         <section class="settings-card">
@@ -350,7 +377,29 @@
             </span>
             <input type="checkbox" id="otc-trading-toggle" />
           </label>
+          <label>Chat ID Telegram OTC
+            <input type="text" id="settings-otc-chat-id" placeholder="-100..." />
+          </label>
+          <label>Conta IQ Option
+            <input type="text" id="settings-iq-account-mode" disabled />
+          </label>
         </section>
+
+        <section class="settings-card">
+          <h3>Contexto IA / Segurança</h3>
+          <label class="toggle-row">
+            <span>Contexto habilitado <span class="hint">CONTEXT_ENABLED</span></span>
+            <input type="checkbox" id="settings-context-enabled" />
+          </label>
+          <label>Limite de notícias
+            <input type="number" id="settings-news-limit" min="1" max="50" step="1" />
+          </label>
+          <div id="settings-secrets-status" class="subtitle" style="margin-top:0.6rem;"></div>
+        </section>
+      </div>
+      <div style="margin-top: 0.9rem;">
+        <button type="button" class="secondary" id="settings-save-btn">Salvar configurações</button>
+        <p class="subtitle">Obs.: alterações aqui valem imediatamente, mas não persistem no Easypanel após novo deploy.</p>
       </div>
     </section>
 
@@ -362,6 +411,6 @@
   </div>
 
   <div id="modal-root"></div>
-  <script src="/dashboard/static/dashboard.js?v=13" defer></script>
+  <script src="/dashboard/static/dashboard.js?v=14" defer></script>
 </body>
 </html>

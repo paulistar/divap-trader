@@ -97,6 +97,15 @@ class DashboardSettingsBody(BaseModel):
 
     binance_trading_enabled: bool | None = None
     otc_trading_enabled: bool | None = None
+    trading_mode: str | None = Field(default=None, pattern=r"^(testnet|live)$")
+    binance_use_testnet: bool | None = None
+    trading_min_confidence: str | None = Field(default=None, pattern=r"^(high|medium)$")
+    trading_block_on_context_reject: bool | None = None
+    trading_max_open_trades: int | None = Field(default=None, ge=1, le=50)
+    trading_dry_run: bool | None = None
+    context_enabled: bool | None = None
+    context_news_limit: int | None = Field(default=None, ge=1, le=50)
+    otc_telegram_chat_id: str | None = None
 
 
 async def require_dashboard_session(request: Request) -> None:
@@ -291,10 +300,27 @@ async def dashboard_settings(
             "binance": {
                 "trading_enabled": settings.trading_enabled,
                 "trading_mode": settings.trading_mode,
+                "use_testnet": settings.binance_use_testnet,
+                "min_confidence": settings.trading_min_confidence,
+                "block_on_reject": settings.trading_block_on_context_reject,
+                "max_open_trades": settings.trading_max_open_trades,
+                "dry_run": settings.trading_dry_run,
+                "context_enabled": settings.context_enabled,
+                "context_news_limit": settings.context_news_limit,
             },
             "otc": {
                 "trading_enabled": settings.otc_trading_enabled,
+                "telegram_chat_id": settings.otc_telegram_chat_id,
                 "status": build_otc_status(),
+            },
+            "secrets": {
+                "binance_api_key_configured": bool(settings.binance_api_key),
+                "binance_api_secret_configured": bool(settings.binance_api_secret),
+                "iqoption_mcp_token_configured": bool(settings.iqoption_mcp_token),
+                "iqoption_login_configured": bool(
+                    settings.iqoption_email and settings.iqoption_password
+                ),
+                "telegram_bot_token_configured": bool(settings.telegram_bot_token),
             },
         },
     )
@@ -313,6 +339,24 @@ async def dashboard_settings_update(
         settings.trading_enabled = bool(body.binance_trading_enabled)
     if body.otc_trading_enabled is not None:
         settings.otc_trading_enabled = bool(body.otc_trading_enabled)
+    if body.trading_mode is not None:
+        settings.trading_mode = body.trading_mode
+    if body.binance_use_testnet is not None:
+        settings.binance_use_testnet = bool(body.binance_use_testnet)
+    if body.trading_min_confidence is not None:
+        settings.trading_min_confidence = body.trading_min_confidence
+    if body.trading_block_on_context_reject is not None:
+        settings.trading_block_on_context_reject = bool(body.trading_block_on_context_reject)
+    if body.trading_max_open_trades is not None:
+        settings.trading_max_open_trades = int(body.trading_max_open_trades)
+    if body.trading_dry_run is not None:
+        settings.trading_dry_run = bool(body.trading_dry_run)
+    if body.context_enabled is not None:
+        settings.context_enabled = bool(body.context_enabled)
+    if body.context_news_limit is not None:
+        settings.context_news_limit = int(body.context_news_limit)
+    if body.otc_telegram_chat_id is not None:
+        settings.otc_telegram_chat_id = body.otc_telegram_chat_id.strip()
 
     from src.otc.service import build_otc_status
 
@@ -322,10 +366,27 @@ async def dashboard_settings_update(
             "binance": {
                 "trading_enabled": settings.trading_enabled,
                 "trading_mode": settings.trading_mode,
+                "use_testnet": settings.binance_use_testnet,
+                "min_confidence": settings.trading_min_confidence,
+                "block_on_reject": settings.trading_block_on_context_reject,
+                "max_open_trades": settings.trading_max_open_trades,
+                "dry_run": settings.trading_dry_run,
+                "context_enabled": settings.context_enabled,
+                "context_news_limit": settings.context_news_limit,
             },
             "otc": {
                 "trading_enabled": settings.otc_trading_enabled,
+                "telegram_chat_id": settings.otc_telegram_chat_id,
                 "status": build_otc_status(),
+            },
+            "secrets": {
+                "binance_api_key_configured": bool(settings.binance_api_key),
+                "binance_api_secret_configured": bool(settings.binance_api_secret),
+                "iqoption_mcp_token_configured": bool(settings.iqoption_mcp_token),
+                "iqoption_login_configured": bool(
+                    settings.iqoption_email and settings.iqoption_password
+                ),
+                "telegram_bot_token_configured": bool(settings.telegram_bot_token),
             },
         },
     )

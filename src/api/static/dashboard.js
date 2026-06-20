@@ -513,10 +513,31 @@ async function loadDashboardSettings() {
     const data = await fetchDashboardSettings();
     const bin = data.binance || {};
     const otc = data.otc || {};
+    const secrets = data.secrets || {};
     const binToggle = document.getElementById("binance-trading-toggle");
     const otcToggle = document.getElementById("otc-trading-toggle");
     if (binToggle) binToggle.checked = !!bin.trading_enabled;
     if (otcToggle) otcToggle.checked = !!otc.trading_enabled;
+    setVal("settings-trading-mode", bin.trading_mode || "testnet");
+    setChecked("settings-binance-testnet", !!bin.use_testnet);
+    setVal("settings-min-confidence", bin.min_confidence || "high");
+    setChecked("settings-block-reject", !!bin.block_on_reject);
+    setVal("settings-max-open", String(bin.max_open_trades ?? 5));
+    setChecked("settings-dry-run", !!bin.dry_run);
+    setChecked("settings-context-enabled", !!bin.context_enabled);
+    setVal("settings-news-limit", String(bin.context_news_limit ?? 5));
+    setVal("settings-otc-chat-id", otc.telegram_chat_id || "");
+    setVal("settings-iq-account-mode", otc.status?.account_mode || "—");
+    const statusEl = document.getElementById("settings-secrets-status");
+    if (statusEl) {
+      statusEl.textContent = [
+        `Binance key: ${secrets.binance_api_key_configured ? "OK" : "faltando"}`,
+        `Binance secret: ${secrets.binance_api_secret_configured ? "OK" : "faltando"}`,
+        `IQ MCP token: ${secrets.iqoption_mcp_token_configured ? "OK" : "faltando"}`,
+        `IQ login: ${secrets.iqoption_login_configured ? "OK" : "faltando"}`,
+        `Telegram bot: ${secrets.telegram_bot_token_configured ? "OK" : "faltando"}`,
+      ].join(" · ");
+    }
   } catch (_) {
     // silencioso — aba Configurações é opcional
   }
@@ -528,13 +549,44 @@ async function saveDashboardSettingsFromForm() {
   const payload = {
     binance_trading_enabled: binToggle ? !!binToggle.checked : undefined,
     otc_trading_enabled: otcToggle ? !!otcToggle.checked : undefined,
+    trading_mode: getVal("settings-trading-mode"),
+    binance_use_testnet: getChecked("settings-binance-testnet"),
+    trading_min_confidence: getVal("settings-min-confidence"),
+    trading_block_on_context_reject: getChecked("settings-block-reject"),
+    trading_max_open_trades: Number(getVal("settings-max-open") || 5),
+    trading_dry_run: getChecked("settings-dry-run"),
+    context_enabled: getChecked("settings-context-enabled"),
+    context_news_limit: Number(getVal("settings-news-limit") || 5),
+    otc_telegram_chat_id: getVal("settings-otc-chat-id"),
   };
   try {
     await saveDashboardSettings(payload);
     showSuccess("Configurações atualizadas (válidas até próximo deploy).");
+    if (getViewMode() === "otc") {
+      loadOtc();
+    } else if (getViewMode() === "binance") {
+      loadDashboard();
+    }
   } catch (err) {
     showError(err.message || "Falha ao salvar configurações");
   }
+}
+
+function setVal(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value ?? "";
+}
+function setChecked(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.checked = !!value;
+}
+function getVal(id) {
+  const el = document.getElementById(id);
+  return el ? String(el.value || "").trim() : "";
+}
+function getChecked(id) {
+  const el = document.getElementById(id);
+  return !!(el && el.checked);
 }
 
 function profileFitClass(status) {
@@ -1185,8 +1237,7 @@ document.getElementById("save-bankroll-btn")?.addEventListener("click", async ()
   }
 });
 
-document.getElementById("binance-trading-toggle")?.addEventListener("change", saveDashboardSettingsFromForm);
-document.getElementById("otc-trading-toggle")?.addEventListener("change", saveDashboardSettingsFromForm);
+document.getElementById("settings-save-btn")?.addEventListener("click", saveDashboardSettingsFromForm);
 
 /* ===================== IQ Option (OTC) ===================== */
 let otcOverview = null;
