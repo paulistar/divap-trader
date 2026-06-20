@@ -104,7 +104,7 @@ async def require_dashboard_session(request: Request) -> None:
 
 def _build_stats() -> dict:
     repo = TradeRepository()
-    stats = repo.get_stats()
+    stats = repo.get_binance_stats()
     return {
         "closed_count": stats.closed_count,
         "wins": stats.wins,
@@ -225,8 +225,8 @@ async def dashboard_data(
         context_verdict=verdict_filter,
         within_hours=hours,
     )
-    open_trades = trade_repo.list_open_trades()
-    all_trades = trade_repo.list_trades(limit=limit, offset=0)
+    open_trades = trade_repo.list_binance_open_trades()
+    all_trades = trade_repo.list_binance_trades(limit=limit, offset=0)
     closed_trades = [t for t in all_trades if t.status == "closed"]
     price_symbols = {t.symbol for t in open_trades} | {t.symbol for t in closed_trades}
     live_prices = _fetch_live_prices(price_symbols)

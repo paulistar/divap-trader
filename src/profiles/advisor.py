@@ -104,10 +104,10 @@ def assess_profile(
 def assess_all_profiles(
     market: dict, active_profile_ids: tuple[str, ...] | list[str]
 ) -> list[ProfileSnapshot]:
-    from src.profiles.loader import load_all_profiles
+    from src.profiles.loader import load_binance_profiles
 
     snapshots: list[ProfileSnapshot] = []
-    for profile in load_all_profiles():
+    for profile in load_binance_profiles():
         assessment = assess_profile(profile, market, active_profile_ids=active_profile_ids)
         snapshots.append(ProfileSnapshot(profile=profile, assessment=assessment))
     return snapshots

@@ -569,7 +569,7 @@ function renderBankroll(bankroll, profilesPayload) {
   const b = bankroll || {};
   const list = document.getElementById("active-profiles-list");
   const targetInput = document.getElementById("monthly-target-input");
-  const profileOptions = profilesPayload?.profiles || [];
+  const profileOptions = (profilesPayload?.profiles || []).filter((p) => p.id !== "otc");
   const activeIds = b.active_profile_ids?.length
     ? b.active_profile_ids
     : [b.active_profile_id].filter(Boolean);
@@ -1069,7 +1069,7 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   }
 });
 
-document.getElementById("refresh-btn").addEventListener("click", loadDashboard);
+document.getElementById("refresh-btn").addEventListener("click", refreshTick);
 document.getElementById("logout-btn").addEventListener("click", async () => {
   await logoutSession();
   showLogin();

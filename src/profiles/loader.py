@@ -102,6 +102,14 @@ def load_all_profiles() -> tuple[TradingProfile, ...]:
     return tuple(profiles)
 
 
+@lru_cache
+def load_binance_profiles() -> tuple[TradingProfile, ...]:
+    """Perfis DIVAP/Binance — exclui OTC (IQ Option), que tem aba própria no painel."""
+    return tuple(
+        p for p in load_all_profiles() if p.kind != "otc" and p.id != "otc"
+    )
+
+
 def protected_execution_profile() -> ProfileExecution:
     """Após meta mensal atingida — só entradas de alta certeza."""
     base = load_profile("conservador")

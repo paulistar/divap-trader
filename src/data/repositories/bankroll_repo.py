@@ -32,6 +32,7 @@ MONTHLY_PNL_SQL = """
 SELECT COALESCE(SUM(pnl_usdt), 0) AS total
 FROM trades
 WHERE status = 'closed'
+  AND COALESCE(venue, 'binance') <> 'iqoption'
   AND closed_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
   AND closed_at < date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
 """
@@ -40,6 +41,7 @@ WEEKLY_PNL_SQL = """
 SELECT COALESCE(SUM(pnl_usdt), 0) AS total
 FROM trades
 WHERE status = 'closed'
+  AND COALESCE(venue, 'binance') <> 'iqoption'
   AND closed_at >= date_trunc('week', NOW() AT TIME ZONE 'UTC')
   AND closed_at < date_trunc('week', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 week'
 """

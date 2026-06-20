@@ -214,7 +214,7 @@ def get_scan_status_payload() -> dict:
 
 def build_pnl_series(limit: int = 100) -> list[dict]:
     repo = TradeRepository()
-    rows = repo.pnl_history(limit)
+    rows = repo.binance_pnl_history(limit)
     cumulative = Decimal(0)
     series: list[dict] = []
     for row in rows:

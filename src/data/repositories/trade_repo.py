@@ -17,6 +17,9 @@ from src.otc.periods import (
 )
 
 OTC_VENUE = "iqoption"
+OTC_PROFILE_ID = "otc"
+# Trades Binance no painel — exclui IQ Option / OTC (mesma tabela `trades`).
+BINANCE_SCOPE_SQL = f"AND COALESCE(venue, 'binance') <> '{OTC_VENUE}'"
 
 OTC_STATS_SQL = """
 SELECT
@@ -61,6 +64,12 @@ INSERT INTO trades (
 
 SELECT_OPEN_TRADES_SQL = """
 SELECT * FROM trades WHERE status = 'open' ORDER BY opened_at ASC
+"""
+
+SELECT_OPEN_BINANCE_TRADES_SQL = f"""
+SELECT * FROM trades
+WHERE status = 'open' {BINANCE_SCOPE_SQL}
+ORDER BY opened_at ASC
 """
 
 COUNT_OPEN_TRADES_SQL = """
@@ -114,6 +123,13 @@ ORDER BY created_at DESC
 LIMIT %s OFFSET %s
 """
 
+SELECT_BINANCE_TRADES_SQL = f"""
+SELECT * FROM trades
+WHERE status != 'simulated' {BINANCE_SCOPE_SQL}
+ORDER BY created_at DESC
+LIMIT %s OFFSET %s
+"""
+
 SELECT_TRADE_SQL = """
 SELECT * FROM trades WHERE id = %s
 """
@@ -122,6 +138,14 @@ PNL_HISTORY_SQL = """
 SELECT id, closed_at, pnl_usdt, pnl_pct, profile_id
 FROM trades
 WHERE status = 'closed' AND closed_at IS NOT NULL
+ORDER BY closed_at ASC
+LIMIT %s
+"""
+
+BINANCE_PNL_HISTORY_SQL = f"""
+SELECT id, closed_at, pnl_usdt, pnl_pct, profile_id
+FROM trades
+WHERE status = 'closed' AND closed_at IS NOT NULL {BINANCE_SCOPE_SQL}
 ORDER BY closed_at ASC
 LIMIT %s
 """
@@ -170,6 +194,42 @@ SELECT
     COALESCE(SUM(fees_usdt) FILTER (WHERE status = 'closed'), 0) AS total_fees_usdt
 FROM trades
 WHERE status != 'simulated'
+"""
+
+BINANCE_STATS_SQL = f"""
+SELECT
+    COUNT(*) FILTER (WHERE status = 'closed') AS closed_count,
+    COUNT(*) FILTER (WHERE status = 'closed' AND pnl_usdt > 0) AS wins,
+    COUNT(*) FILTER (WHERE status = 'closed' AND pnl_usdt <= 0) AS losses,
+    COUNT(*) FILTER (WHERE status = 'open') AS open_count,
+    COALESCE(SUM(pnl_usdt) FILTER (WHERE status = 'closed'), 0) AS total_pnl_usdt,
+    COALESCE(AVG(pnl_pct) FILTER (WHERE status = 'closed'), 0) AS avg_pnl_pct,
+    COALESCE(SUM(fees_usdt) FILTER (WHERE status = 'closed'), 0) AS total_fees_usdt
+FROM trades
+WHERE status != 'simulated' {BINANCE_SCOPE_SQL}
+"""
+
+PROFILE_STATS_BINANCE_SQL = f"""
+SELECT
+    COALESCE(profile_id, 'divap') AS profile_id,
+    COUNT(*) FILTER (WHERE status = 'closed') AS closed_count,
+    COUNT(*) FILTER (WHERE status = 'open') AS open_count,
+    COUNT(*) FILTER (WHERE status = 'closed' AND pnl_usdt > 0) AS wins,
+    COUNT(*) FILTER (WHERE status = 'closed' AND pnl_usdt <= 0) AS losses,
+    COALESCE(SUM(pnl_usdt) FILTER (WHERE status = 'closed'), 0) AS total_pnl_usdt,
+    COALESCE(SUM(pnl_usdt) FILTER (
+        WHERE status = 'closed'
+          AND closed_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC')
+          AND closed_at < date_trunc('month', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 month'
+    ), 0) AS month_pnl_usdt,
+    COALESCE(SUM(pnl_usdt) FILTER (
+        WHERE status = 'closed'
+          AND closed_at >= date_trunc('week', NOW() AT TIME ZONE 'UTC')
+          AND closed_at < date_trunc('week', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 week'
+    ), 0) AS week_pnl_usdt
+FROM trades
+WHERE status != 'simulated' {BINANCE_SCOPE_SQL}
+GROUP BY COALESCE(profile_id, 'divap')
 """
 
 
@@ -348,6 +408,13 @@ class TradeRepository:
                 rows = cur.fetchall()
         return [self._row_to_record(row) for row in rows]
 
+    def list_binance_open_trades(self) -> list[TradeRecord]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(SELECT_OPEN_BINANCE_TRADES_SQL)
+                rows = cur.fetchall()
+        return [self._row_to_record(row) for row in rows]
+
     def list_trades(self, limit: int = 20, offset: int = 0) -> list[TradeRecord]:
         with self._connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -355,10 +422,23 @@ class TradeRepository:
                 rows = cur.fetchall()
         return [self._row_to_record(row) for row in rows]
 
+    def list_binance_trades(self, limit: int = 20, offset: int = 0) -> list[TradeRecord]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(SELECT_BINANCE_TRADES_SQL, (limit, offset))
+                rows = cur.fetchall()
+        return [self._row_to_record(row) for row in rows]
+
     def profile_stats(self) -> list[dict]:
         with self._connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(PROFILE_STATS_SQL)
+                return list(cur.fetchall())
+
+    def profile_stats_binance(self) -> list[dict]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(PROFILE_STATS_BINANCE_SQL)
                 return list(cur.fetchall())
 
     def recent_trades_for_profile(
@@ -373,6 +453,12 @@ class TradeRepository:
         with self._connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(PNL_HISTORY_SQL, (limit,))
+                return list(cur.fetchall())
+
+    def binance_pnl_history(self, limit: int = 100) -> list[dict]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(BINANCE_PNL_HISTORY_SQL, (limit,))
                 return list(cur.fetchall())
 
     def get_trade(self, trade_id: int) -> TradeRecord | None:
@@ -444,6 +530,17 @@ class TradeRepository:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(STATS_SQL)
                 row = cur.fetchone()
+        return self._stats_from_row(row)
+
+    def get_binance_stats(self) -> TradeStats:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(BINANCE_STATS_SQL)
+                row = cur.fetchone()
+        return self._stats_from_row(row)
+
+    @staticmethod
+    def _stats_from_row(row: dict) -> TradeStats:
         return TradeStats(
             closed_count=row["closed_count"] or 0,
             wins=row["wins"] or 0,

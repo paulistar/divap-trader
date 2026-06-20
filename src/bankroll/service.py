@@ -69,14 +69,14 @@ def build_bankroll_payload() -> dict:
 
 
 def build_profile_performance() -> list[dict]:
-    from src.profiles.loader import load_all_profiles
+    from src.profiles.loader import load_binance_profiles
     from src.data.repositories.trade_repo import TradeRepository
 
-    stats_rows = TradeRepository().profile_stats()
+    stats_rows = TradeRepository().profile_stats_binance()
     stats_map = {row["profile_id"]: row for row in stats_rows}
     performance: list[dict] = []
 
-    for profile in load_all_profiles():
+    for profile in load_binance_profiles():
         row = stats_map.get(profile.id, {})
         closed = int(row.get("closed_count") or 0)
         wins = int(row.get("wins") or 0)
@@ -99,12 +99,12 @@ def build_profile_performance() -> list[dict]:
 
 
 def build_profile_history(limit_per_profile: int = 5) -> dict[str, list[dict]]:
-    from src.profiles.loader import load_all_profiles
+    from src.profiles.loader import load_binance_profiles
     from src.data.repositories.trade_repo import TradeRepository
 
     repo = TradeRepository()
     history: dict[str, list[dict]] = {}
-    for profile in load_all_profiles():
+    for profile in load_binance_profiles():
         rows = repo.recent_trades_for_profile(profile.id, limit_per_profile)
         history[profile.id] = [
             {
