@@ -111,7 +111,7 @@ SCHEMA_STATEMENTS: list[str] = [
     "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS stake_pct NUMERIC(8, 4)",
     "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS stake_min_usd NUMERIC(20, 2) DEFAULT 1.00",
     "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS stake_max_usd NUMERIC(20, 2)",
-    "ALTER TABLE otc_daily_session ADD COLUMN IF NOT EXISTS stake_risk_profile TEXT DEFAULT 'moderate'",
+    "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS stake_risk_profile TEXT DEFAULT 'moderate'",
     "CREATE INDEX IF NOT EXISTS idx_trades_market ON trades (market, status, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_alerts_market ON alerts (market, created_at DESC)",
     """
@@ -154,6 +154,7 @@ SCHEMA_STATEMENTS: list[str] = [
         captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
     """,
+    "ALTER TABLE otc_daily_session ADD COLUMN IF NOT EXISTS stake_risk_profile TEXT DEFAULT 'moderate'",
 ]
 
 
