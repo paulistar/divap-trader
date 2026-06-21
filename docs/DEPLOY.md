@@ -75,14 +75,40 @@ Token em IQ Option → Settings → AI integrations. Ver `docs/iqoption-setup.md
 | Serviço Compose | **app** (`composeService` no domínio Easypanel) |
 | Protocolo interno | HTTP |
 
-### 5. Init do banco (após primeiro deploy)
+### 5. Deploy (canônico — git pull + rebuild)
+
+**Regra:** nunca faça `git pull` dentro de containers `app`/`worker` em execução. O código entra na imagem no `docker compose build`; pull in-container só mascara drift e some no próximo rebuild.
+
+O checkout oficial fica em:
+
+`/etc/easypanel/projects/martstudios/divap-trader/code`
+
+**Opção A — script (recomendado para agentes/SSH/MCP):**
 
 ```bash
-# Via terminal do serviço app no Easypanel, ou SSH na VPS:
-docker exec -it <container-app> python scripts/init_db.py
+# Na VPS (sidecar com acesso ao docker socket):
+./scripts/trigger-easypanel-deploy.sh
+
+# Ou dentro do container Easypanel:
+cd /etc/easypanel/projects/martstudios/divap-trader/code
+./scripts/deploy-easypanel.sh
 ```
 
-### 6. Cloudflare DNS
+O script faz: `git pull` → `docker compose up -d --build` → `init_db.py` → health check.
+
+**Opção B — painel Easypanel:** botão **Deploy** no serviço Compose `divap-trader`.
+
+**Opção C — CI GitHub (após push em `main`):** configure o secret `EASYPANEL_DEPLOY_WEBHOOK_URL` no repositório (Settings → Secrets → Actions). URL em Easypanel → serviço → **Deployments** → **Deployment Trigger**. O workflow `.github/workflows/ci.yml` roda testes e aciona o webhook.
+
+### 6. Init do banco (primeiro deploy ou migração manual)
+
+Normalmente o `deploy-easypanel.sh` já executa `init_db.py`. Se precisar rodar isolado:
+
+```bash
+docker exec -it martstudios_divap-trader-app-1 python scripts/init_db.py
+```
+
+### 7. Cloudflare DNS
 
 | Tipo | Nome | Conteúdo | Proxy |
 |------|------|----------|-------|

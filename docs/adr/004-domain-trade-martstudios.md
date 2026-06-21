@@ -22,4 +22,4 @@ Deploy na VPS Mart Studios com Cloudflare na frente. Domínio definido pelo oper
 - Positivo: alinhado à infra Mart Studios existente, sem conflito na :80
 - Positivo: deploy via Compose no projeto `martstudios` do Easypanel
 - Negativo: depende do painel Easypanel para roteamento de domínio
-- Evolução: auto-deploy GitHub após push no repo `divap-trader`
+- Auto-deploy: GitHub Actions (`.github/workflows/ci.yml`) + webhook `EASYPANEL_DEPLOY_WEBHOOK_URL`; fallback manual via `scripts/deploy-easypanel.sh`
