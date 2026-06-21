@@ -54,6 +54,22 @@ def bucket_expr(period: str, column: str, timezone: str = DEFAULT_TIMEZONE) -> s
     return f"date_trunc('{period}', {local})"
 
 
+def same_period_as_ref(
+    period: str, column: str, timezone: str = DEFAULT_TIMEZONE
+) -> str:
+    """True quando ``column`` cai no mesmo bucket de período que o timestamp ``%s``."""
+    col_bucket = bucket_expr(period, column, timezone)
+    local = f"(%s::timestamptz AT TIME ZONE '{timezone}')"
+    if period == "semester":
+        ref_bucket = (
+            f"(date_trunc('year', {local}) + "
+            f"(floor((extract(month from {local})::int - 1) / 6) * interval '6 months'))"
+        )
+    else:
+        ref_bucket = f"date_trunc('{period}', {local})"
+    return f"{col_bucket} = {ref_bucket}"
+
+
 def current_period_predicate(period: str, column: str, timezone: str = DEFAULT_TIMEZONE) -> str:
     """Filtro SQL booleano que isola o período corrente (hoje/semana atual/...)."""
     period = normalize_period(period)

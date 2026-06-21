@@ -268,7 +268,10 @@
           <select id="otc-period-select" class="otc-select"></select>
         </div>
         <div class="grid grid-market" id="otc-period-totals"></div>
-        <div class="chart-wrap"><canvas id="otc-pnl-chart"></canvas></div>
+        <div class="chart-wrap otc-chart-wrap">
+          <canvas id="otc-pnl-chart"></canvas>
+          <div id="otc-pnl-tooltip" class="otc-pnl-tooltip hidden" role="tooltip"></div>
+        </div>
         <p class="subtitle" id="otc-pnl-total">—</p>
       </section>
 
@@ -311,7 +314,16 @@
       </section>
 
       <section class="otc-trades-section">
-        <h3 class="otc-h">Operações recentes</h3>
+        <div class="otc-trades-head">
+          <h3 class="otc-h">Operações recentes</h3>
+          <div class="otc-trades-filters">
+            <label class="otc-trades-date-label">Filtrar por dia
+              <input type="date" id="otc-trades-date" class="otc-select" />
+            </label>
+            <button type="button" class="secondary" id="otc-trades-date-clear">Limpar</button>
+          </div>
+        </div>
+        <p class="subtitle otc-trades-hint" id="otc-trades-hint">Últimas 50 operações. Clique em uma barra do gráfico ou escolha um dia.</p>
         <div class="table-wrap">
           <table>
             <thead>

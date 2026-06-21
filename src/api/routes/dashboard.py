@@ -620,6 +620,18 @@ async def dashboard_otc_pnl(
     return ApiResponse(success=True, data=build_otc_pnl(period, limit=safe_limit))
 
 
+@router.get("/dashboard/otc/trades", include_in_schema=False)
+async def dashboard_otc_trades_by_day(
+    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    limit: int = 500,
+    _: None = Depends(require_dashboard_session),
+) -> ApiResponse[dict]:
+    from src.otc.service import build_otc_trades_for_day
+
+    safe_limit = max(1, min(limit, 1000))
+    return ApiResponse(success=True, data=build_otc_trades_for_day(date, limit=safe_limit))
+
+
 @router.get("/dashboard/otc/usd-brl", include_in_schema=False)
 async def dashboard_otc_usd_brl(
     _: None = Depends(require_dashboard_session),

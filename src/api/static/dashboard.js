@@ -1364,6 +1364,18 @@ document.getElementById("settings-copy-env-btn")?.addEventListener("click", copy
 let otcOverview = null;
 let otcPnlLoaded = false;
 let otcFxAutoTimer = null;
+let otcChartLayout = null;
+let otcChartSeries = [];
+let otcTradesDateFilter = null;
+
+const OTC_PERIOD_LABELS = {
+  day: "Dia",
+  week: "Semana",
+  month: "Mês",
+  quarter: "Trimestre",
+  semester: "Semestre",
+  year: "Ano",
+};
 const DEFAULT_USD_BRL = 5.4;
 const OTC_FX_REFRESH_MS = 10 * 60 * 1000;
 
@@ -1448,7 +1460,7 @@ async function fetchOtcUsdBrlRate({ persist = false, silent = false } = {}) {
     renderOtcStats(otcOverview);
     renderOtcMartingale(otcOverview);
     renderOtcPeriodTotals(otcOverview);
-    renderOtcTrades(otcOverview.trades);
+    loadOtcTradesFiltered();
     loadOtcPnl();
   }
   return rate;
@@ -1538,6 +1550,15 @@ async function fetchOtcPnl(period) {
   return body.data || {};
 }
 
+async function fetchOtcTradesByDay(dateKey) {
+  const res = await fetch(`/dashboard/otc/trades?date=${encodeURIComponent(dateKey)}`, {
+    credentials: "same-origin",
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || body.error || `Erro ${res.status}`);
+  return body.data || {};
+}
+
 async function loadOtc() {
   try {
     otcOverview = await fetchOtcOverview();
@@ -1573,7 +1594,7 @@ function renderOtc(d) {
   renderOtcStats(d);
   renderOtcMartingale(d);
   renderOtcPeriodTotals(d);
-  renderOtcTrades(d.trades);
+  loadOtcTradesFiltered();
   fillOtcSettingsForm(d.settings);
 }
 
@@ -1688,6 +1709,83 @@ function renderOtcPeriodTotals(d) {
   document.getElementById("otc-period-totals").innerHTML = cards.join("");
 }
 
+function formatOtcBucketLabel(period, bucketIso) {
+  if (!bucketIso) return "—";
+  const d = new Date(bucketIso);
+  if (Number.isNaN(d.getTime())) return bucketIso;
+  const tzOpts = { timeZone: "America/Sao_Paulo" };
+  if (period === "day") {
+    return d.toLocaleDateString("pt-BR", { ...tzOpts, day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+  if (period === "week") {
+    return `Sem. ${d.toLocaleDateString("pt-BR", { ...tzOpts, day: "2-digit", month: "short", year: "numeric" })}`;
+  }
+  if (period === "month") {
+    return d.toLocaleDateString("pt-BR", { ...tzOpts, month: "long", year: "numeric" });
+  }
+  if (period === "quarter") {
+    const month = Number(
+      new Intl.DateTimeFormat("pt-BR", { ...tzOpts, month: "numeric" }).format(d),
+    );
+    const year = new Intl.DateTimeFormat("pt-BR", { ...tzOpts, year: "numeric" }).format(d);
+    return `T${Math.ceil(month / 3)}/${year}`;
+  }
+  if (period === "semester") {
+    const month = Number(
+      new Intl.DateTimeFormat("pt-BR", { ...tzOpts, month: "numeric" }).format(d),
+    );
+    const year = new Intl.DateTimeFormat("pt-BR", { ...tzOpts, year: "numeric" }).format(d);
+    return month <= 6 ? `S1/${year}` : `S2/${year}`;
+  }
+  if (period === "year") {
+    return new Intl.DateTimeFormat("pt-BR", { ...tzOpts, year: "numeric" }).format(d);
+  }
+  return d.toLocaleDateString("pt-BR", tzOpts);
+}
+
+function bucketToLocalDateKey(bucketIso) {
+  if (!bucketIso) return null;
+  const d = new Date(bucketIso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+}
+
+function updateOtcTradesHint(text) {
+  const el = document.getElementById("otc-trades-hint");
+  if (el) el.textContent = text;
+}
+
+async function loadOtcTradesFiltered() {
+  const dateInput = document.getElementById("otc-trades-date");
+  if (dateInput && otcTradesDateFilter) dateInput.value = otcTradesDateFilter;
+
+  if (otcTradesDateFilter) {
+    try {
+      const data = await fetchOtcTradesByDay(otcTradesDateFilter);
+      renderOtcTrades(data.trades || []);
+      const dayLabel = new Date(otcTradesDateFilter + "T12:00:00").toLocaleDateString("pt-BR");
+      updateOtcTradesHint(
+        `${data.count ?? 0} operações em ${dayLabel} · Total: ${otcMoney(data.total_pnl_usd, { sign: true })}`,
+      );
+    } catch (err) {
+      showError(err.message || "Falha ao carregar operações do dia");
+    }
+    return;
+  }
+
+  if (otcOverview?.trades) {
+    renderOtcTrades(otcOverview.trades);
+    updateOtcTradesHint("Últimas 50 operações. Clique em uma barra do gráfico ou escolha um dia.");
+  }
+}
+
+function setOtcTradesDateFilter(dateKey) {
+  otcTradesDateFilter = dateKey || null;
+  const dateInput = document.getElementById("otc-trades-date");
+  if (dateInput) dateInput.value = otcTradesDateFilter || "";
+  loadOtcTradesFiltered();
+}
+
 function renderOtcTrades(trades) {
   const body = document.getElementById("otc-trades-body");
   if (!body) return;
@@ -1772,10 +1870,91 @@ function renderOtcPnl(data) {
   if (totalEl) {
     totalEl.innerHTML = `Total no período exibido: <strong class="${signClass(data.total_usd)}">${otcMoney(data.total_usd, { sign: true })}</strong>`;
   }
-  drawOtcChart(document.getElementById("otc-pnl-chart"), data.series || []);
+  otcChartSeries = data.series || [];
+  drawOtcChart(document.getElementById("otc-pnl-chart"), otcChartSeries, null, data.period || getOtcPeriod());
+  bindOtcChartInteraction();
 }
 
-function drawOtcChart(canvas, series) {
+function otcBarIndexFromX(x) {
+  if (!otcChartLayout) return null;
+  const idx = Math.floor(x / otcChartLayout.slot);
+  if (idx < 0 || idx >= otcChartLayout.series.length) return null;
+  return idx;
+}
+
+function hideOtcChartTooltip() {
+  const tooltip = document.getElementById("otc-pnl-tooltip");
+  if (tooltip) tooltip.classList.add("hidden");
+}
+
+function showOtcChartTooltip(clientX, clientY, index) {
+  const tooltip = document.getElementById("otc-pnl-tooltip");
+  const wrap = document.querySelector(".otc-chart-wrap");
+  if (!tooltip || !wrap || !otcChartSeries[index]) return;
+
+  const point = otcChartSeries[index];
+  const period = otcChartLayout?.chartPeriod || getOtcPeriod();
+  const title = formatOtcBucketLabel(period, point.bucket);
+  const breakdown = point.breakdown || {};
+  const order = ["day", "week", "month", "quarter", "semester", "year"];
+  const rows = order
+    .map((p) => {
+      const b = breakdown[p] || {};
+      const pnl = b.pnl_usd ?? "0";
+      return `<div class="otc-tip-row"><span>${OTC_PERIOD_LABELS[p]}</span><span class="${signClass(pnl)}">${otcMoney(pnl, { sign: true })} <small>(${b.operations ?? 0} op.)</small></span></div>`;
+    })
+    .join("");
+
+  tooltip.innerHTML = `
+    <div class="otc-tip-title">${title}</div>
+    <div class="otc-tip-bar">Esta barra: <strong class="${signClass(point.pnl_usd)}">${otcMoney(point.pnl_usd, { sign: true })}</strong> · ${point.operations ?? 0} op.</div>
+    ${rows}
+    <div class="otc-tip-hint">Clique para filtrar operações do dia</div>`;
+  tooltip.classList.remove("hidden");
+
+  const rect = wrap.getBoundingClientRect();
+  let left = clientX - rect.left + 12;
+  let top = clientY - rect.top - 8;
+  const maxLeft = rect.width - tooltip.offsetWidth - 8;
+  if (left > maxLeft) left = Math.max(8, maxLeft);
+  if (top + tooltip.offsetHeight > rect.height) top = rect.height - tooltip.offsetHeight - 8;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function bindOtcChartInteraction() {
+  const canvas = document.getElementById("otc-pnl-chart");
+  if (!canvas || canvas.dataset.otcBound === "1") return;
+  canvas.dataset.otcBound = "1";
+
+  canvas.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const idx = otcBarIndexFromX(x);
+    if (idx == null) {
+      hideOtcChartTooltip();
+      drawOtcChart(canvas, otcChartSeries, null, otcChartLayout?.chartPeriod || getOtcPeriod());
+      return;
+    }
+    showOtcChartTooltip(e.clientX, e.clientY, idx);
+    drawOtcChart(canvas, otcChartSeries, idx, otcChartLayout?.chartPeriod || getOtcPeriod());
+  });
+
+  canvas.addEventListener("mouseleave", () => {
+    hideOtcChartTooltip();
+    drawOtcChart(canvas, otcChartSeries, null, otcChartLayout?.chartPeriod || getOtcPeriod());
+  });
+
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const idx = otcBarIndexFromX(e.clientX - rect.left);
+    if (idx == null) return;
+    const dayKey = bucketToLocalDateKey(otcChartSeries[idx]?.bucket);
+    if (dayKey) setOtcTradesDateFilter(dayKey);
+  });
+}
+
+function drawOtcChart(canvas, series, highlightIndex = null, chartPeriod = "day") {
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
@@ -1793,6 +1972,7 @@ function drawOtcChart(canvas, series) {
     ctx.fillStyle = "#a3a3a3";
     ctx.font = "13px Segoe UI, sans-serif";
     ctx.fillText("Sem dados no período.", 12, h / 2);
+    otcChartLayout = null;
     return;
   }
 
@@ -1807,6 +1987,8 @@ function drawOtcChart(canvas, series) {
   const slot = w / n;
   const barW = Math.max(4, Math.min(40, slot * 0.6));
 
+  otcChartLayout = { series, slot, barW, w, h, chartPeriod };
+
   ctx.strokeStyle = "#333";
   ctx.beginPath();
   ctx.moveTo(0, zeroY);
@@ -1818,8 +2000,17 @@ function drawOtcChart(canvas, series) {
     const x = slot * i + (slot - barW) / 2;
     const barH = (Math.abs(v) / range) * usableH;
     const y = v >= 0 ? zeroY - barH : zeroY;
-    ctx.fillStyle = v >= 0 ? "#22c55e" : "#ef4444";
-    ctx.fillRect(x, y, barW, barH || 1);
+    if (i === highlightIndex) {
+      ctx.fillStyle = v >= 0 ? "#4ade80" : "#f87171";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(x, y, barW, barH || 1);
+      ctx.strokeRect(x, y, barW, barH || 1);
+      ctx.lineWidth = 1;
+    } else {
+      ctx.fillStyle = v >= 0 ? "#22c55e" : "#ef4444";
+      ctx.fillRect(x, y, barW, barH || 1);
+    }
   });
 }
 
@@ -1843,6 +2034,14 @@ document.querySelectorAll(".currency-btn").forEach((btn) => {
 document.getElementById("otc-period-select")?.addEventListener("change", (e) => {
   localStorage.setItem("otc_period", e.target.value);
   loadOtcPnl();
+});
+
+document.getElementById("otc-trades-date")?.addEventListener("change", (e) => {
+  setOtcTradesDateFilter(e.target.value || null);
+});
+
+document.getElementById("otc-trades-date-clear")?.addEventListener("click", () => {
+  setOtcTradesDateFilter(null);
 });
 
 document.getElementById("otc-settings-form")?.addEventListener("submit", async (e) => {

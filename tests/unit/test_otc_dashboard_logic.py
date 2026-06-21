@@ -12,6 +12,7 @@ from src.otc.periods import (
     bucket_expr,
     current_period_predicate,
     normalize_period,
+    same_period_as_ref,
 )
 
 
@@ -132,3 +133,8 @@ class TestPeriods:
         pred = current_period_predicate("month", "closed_at", "America/Sao_Paulo")
         assert "=" in pred
         assert pred.count("date_trunc('month'") == 2
+
+    def test_same_period_as_ref_uses_parameter(self):
+        pred = same_period_as_ref("day", "closed_at", "America/Sao_Paulo")
+        assert "%s::timestamptz" in pred
+        assert "date_trunc('day'" in pred

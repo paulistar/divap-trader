@@ -201,6 +201,17 @@ def build_otc_pnl(period: str = "day", limit: int = 30) -> dict:
         series = repo.otc_pnl_series(period, limit=limit, timezone=tz)
     except Exception:
         series = []
+    for point in series:
+        bucket_raw = point.get("bucket")
+        if not bucket_raw:
+            continue
+        try:
+            from datetime import datetime
+
+            ref = datetime.fromisoformat(str(bucket_raw).replace("Z", "+00:00"))
+            point["breakdown"] = repo.otc_pnl_breakdown_at(ref, tz)
+        except Exception:
+            point["breakdown"] = None
     total = sum((Decimal(item["pnl_usd"]) for item in series), Decimal("0"))
     return {
         "period": period,
@@ -210,6 +221,27 @@ def build_otc_pnl(period: str = "day", limit: int = 30) -> dict:
         "available_periods": [
             {"id": p, "label": PERIOD_LABELS[p]} for p in VALID_PERIODS
         ],
+    }
+
+
+def build_otc_trades_for_day(day: str, limit: int = 500) -> dict:
+    """Operações OTC fechadas em um dia (fuso do sinal)."""
+    repo = TradeRepository()
+    tz = load_otc_config().signal_timezone
+    try:
+        rows = repo.list_otc_trades_by_day(day, timezone=tz, limit=limit)
+    except Exception:
+        rows = []
+    trades = [_serialize_otc_trade(t) for t in rows]
+    total_pnl = sum(
+        (Decimal(t["pnl_usd"]) for t in trades if t.get("pnl_usd") is not None),
+        Decimal("0"),
+    )
+    return {
+        "date": day,
+        "trades": trades,
+        "count": len(trades),
+        "total_pnl_usd": str(total_pnl),
     }
 
 

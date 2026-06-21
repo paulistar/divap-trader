@@ -797,6 +797,39 @@ body[data-view="settings"] #settings-section { display: block; }
 
 /* PnL por período */
 .otc-pnl-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.otc-chart-wrap { position: relative; }
+.otc-pnl-tooltip {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 0.65rem 0.75rem;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.otc-pnl-tooltip.hidden { display: none; }
+.otc-tip-title { font-weight: 600; margin-bottom: 0.35rem; color: var(--text); }
+.otc-tip-bar { margin-bottom: 0.45rem; padding-bottom: 0.45rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+.otc-tip-row { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.12rem 0; }
+.otc-tip-row span:first-child { color: var(--text-muted); }
+.otc-tip-hint { margin-top: 0.45rem; font-size: 0.68rem; color: var(--accent); opacity: 0.9; }
+.otc-trades-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+.otc-trades-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; }
+.otc-trades-date-label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem; color: var(--text-muted); }
+.otc-trades-hint { margin: 0 0 0.65rem; }
+#otc-pnl-chart { cursor: crosshair; }
 .otc-select {
   background: var(--bg-card);
   color: var(--text);

@@ -14,6 +14,7 @@ from src.otc.periods import (
     bucket_expr,
     current_period_predicate,
     normalize_period,
+    same_period_as_ref,
 )
 
 OTC_VENUE = "iqoption"
@@ -41,6 +42,17 @@ SELECT id, symbol, direction, status, quantity, pnl_usdt, pnl_pct,
 FROM trades
 WHERE venue = %s
 ORDER BY COALESCE(closed_at, opened_at, created_at) DESC
+LIMIT %s
+"""
+
+LIST_OTC_TRADES_BY_DAY_SQL = """
+SELECT id, symbol, direction, status, quantity, pnl_usdt, pnl_pct,
+       close_reason, opened_at, closed_at, exchange_order_id, trading_mode
+FROM trades
+WHERE venue = %s
+  AND closed_at IS NOT NULL
+  AND (closed_at AT TIME ZONE %s)::date = %s::date
+ORDER BY closed_at DESC
 LIMIT %s
 """
 
@@ -643,6 +655,52 @@ class TradeRepository:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(LIST_OTC_TRADES_SQL, (OTC_VENUE, limit))
                 return list(cur.fetchall())
+
+    def list_otc_trades_by_day(
+        self,
+        day: str,
+        *,
+        timezone: str = DEFAULT_TIMEZONE,
+        limit: int = 500,
+    ) -> list[dict]:
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    LIST_OTC_TRADES_BY_DAY_SQL,
+                    (OTC_VENUE, timezone, day, limit),
+                )
+                return list(cur.fetchall())
+
+    def otc_pnl_breakdown_at(
+        self, ref: datetime, timezone: str = DEFAULT_TIMEZONE
+    ) -> dict[str, dict[str, str | int]]:
+        """PnL e nº de ops por período (dia/semana/...) que contém ``ref``."""
+        selects: list[str] = []
+        for period in VALID_PERIODS:
+            pred = same_period_as_ref(period, "closed_at", timezone)
+            selects.append(
+                f"COALESCE(SUM(pnl_usdt) FILTER (WHERE {pred}), 0) AS {period}_pnl"
+            )
+            selects.append(
+                f"COUNT(*) FILTER (WHERE close_reason = 'expiry' AND {pred}) AS {period}_ops"
+            )
+        sql = (
+            "SELECT " + ", ".join(selects) + " "
+            "FROM trades "
+            "WHERE venue = %s AND status = 'closed' AND closed_at IS NOT NULL"
+        )
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                params: tuple = tuple(ref for _ in VALID_PERIODS) + (OTC_VENUE,)
+                cur.execute(sql, params)
+                row = cur.fetchone() or {}
+        return {
+            period: {
+                "pnl_usd": str(Decimal(str(row.get(f"{period}_pnl") or 0))),
+                "operations": int(row.get(f"{period}_ops") or 0),
+            }
+            for period in VALID_PERIODS
+        }
 
     def _row_to_record(self, row: dict) -> TradeRecord:
         levels_raw = row.get("take_profit_levels")
