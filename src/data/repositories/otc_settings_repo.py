@@ -18,14 +18,15 @@ SELECT_OTC_SETTINGS_SQL = "SELECT * FROM otc_settings WHERE id = 1"
 UPSERT_OTC_SETTINGS_SQL = """
 INSERT INTO otc_settings (
     id, stake_usd, initial_bankroll_usd, daily_goal_usd, monthly_goal_usd,
-    daily_stop_loss_pct, stop_win_enabled, stop_loss_enabled, usd_brl_rate
-) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s)
+    daily_stop_loss_pct, daily_stop_win_pct, stop_win_enabled, stop_loss_enabled, usd_brl_rate
+) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (id) DO UPDATE SET
     stake_usd = EXCLUDED.stake_usd,
     initial_bankroll_usd = EXCLUDED.initial_bankroll_usd,
     daily_goal_usd = EXCLUDED.daily_goal_usd,
     monthly_goal_usd = EXCLUDED.monthly_goal_usd,
     daily_stop_loss_pct = EXCLUDED.daily_stop_loss_pct,
+    daily_stop_win_pct = EXCLUDED.daily_stop_win_pct,
     stop_win_enabled = EXCLUDED.stop_win_enabled,
     stop_loss_enabled = EXCLUDED.stop_loss_enabled,
     usd_brl_rate = EXCLUDED.usd_brl_rate,
@@ -47,6 +48,7 @@ class OtcSettingsRecord:
     daily_goal_usd: Decimal | None
     monthly_goal_usd: Decimal | None
     daily_stop_loss_pct: Decimal | None
+    daily_stop_win_pct: Decimal | None
     stop_win_enabled: bool
     stop_loss_enabled: bool
     usd_brl_rate: Decimal | None
@@ -61,6 +63,7 @@ class OtcSettingsRecord:
             "daily_goal_usd": s(self.daily_goal_usd),
             "monthly_goal_usd": s(self.monthly_goal_usd),
             "daily_stop_loss_pct": s(self.daily_stop_loss_pct),
+            "daily_stop_win_pct": s(self.daily_stop_win_pct),
             "stop_win_enabled": self.stop_win_enabled,
             "stop_loss_enabled": self.stop_loss_enabled,
             "usd_brl_rate": s(self.usd_brl_rate),
@@ -73,6 +76,7 @@ _EMPTY = OtcSettingsRecord(
     daily_goal_usd=None,
     monthly_goal_usd=None,
     daily_stop_loss_pct=None,
+    daily_stop_win_pct=None,
     stop_win_enabled=False,
     stop_loss_enabled=False,
     usd_brl_rate=None,
@@ -105,6 +109,7 @@ class OtcSettingsRepository:
             "daily_goal_usd": current.daily_goal_usd,
             "monthly_goal_usd": current.monthly_goal_usd,
             "daily_stop_loss_pct": current.daily_stop_loss_pct,
+            "daily_stop_win_pct": current.daily_stop_win_pct,
             "stop_win_enabled": current.stop_win_enabled,
             "stop_loss_enabled": current.stop_loss_enabled,
             "usd_brl_rate": current.usd_brl_rate,
@@ -118,6 +123,7 @@ class OtcSettingsRepository:
             "daily_goal_usd",
             "monthly_goal_usd",
             "daily_stop_loss_pct",
+            "daily_stop_win_pct",
             "usd_brl_rate",
         ):
             if key in fields:
@@ -133,6 +139,7 @@ class OtcSettingsRepository:
                         merged["daily_goal_usd"],
                         merged["monthly_goal_usd"],
                         merged["daily_stop_loss_pct"],
+                        merged["daily_stop_win_pct"],
                         merged["stop_win_enabled"],
                         merged["stop_loss_enabled"],
                         merged["usd_brl_rate"],
@@ -148,6 +155,7 @@ class OtcSettingsRepository:
             daily_goal_usd=_dec(row.get("daily_goal_usd")),
             monthly_goal_usd=_dec(row.get("monthly_goal_usd")),
             daily_stop_loss_pct=_dec(row.get("daily_stop_loss_pct")),
+            daily_stop_win_pct=_dec(row.get("daily_stop_win_pct")),
             stop_win_enabled=bool(row.get("stop_win_enabled", False)),
             stop_loss_enabled=bool(row.get("stop_loss_enabled", False)),
             usd_brl_rate=_dec(row.get("usd_brl_rate")),

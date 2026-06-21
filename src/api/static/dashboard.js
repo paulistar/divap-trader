@@ -199,6 +199,17 @@ function bindOtcMoneyInputs() {
   });
 }
 
+function bindOtcPctInputs() {
+  document.querySelectorAll(".otc-pct-input").forEach((el) => {
+    if (el.dataset.pctBound === "1") return;
+    el.dataset.pctBound = "1";
+    el.addEventListener("blur", () => {
+      const parsed = parseMoneyInput(el.value);
+      el.value = parsed == null ? "" : formatMoneyInput(parsed, 2);
+    });
+  });
+}
+
 function fmtDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -1565,6 +1576,7 @@ async function loadOtc() {
     renderOtc(otcOverview);
     syncOtcFxAutoUi();
     bindOtcMoneyInputs();
+    bindOtcPctInputs();
     if (isOtcFxAuto()) {
       try {
         await fetchOtcUsdBrlRate({ persist: true, silent: true });
@@ -1618,7 +1630,7 @@ function renderOtcStopBanner(d) {
   el.classList.remove("hidden");
   if (reason === "stop_win") {
     el.className = "otc-stop-banner win";
-    el.textContent = "🎯 Stop win atingido — operações pausadas até amanhã. Meta do dia batida!";
+    el.textContent = "🎯 Stop win atingido — operações pausadas até amanhã. Limite de lucro do dia atingido!";
   } else {
     el.className = "otc-stop-banner loss";
     el.textContent = "🛑 Stop loss diário atingido — operações pausadas para preservar a banca.";
@@ -1825,9 +1837,11 @@ function fillOtcSettingsForm(s) {
       el.value = v != null && v !== "" ? formatMoneyInput(v, digits) : "";
     }
   };
-  const setVal = (id, v) => {
+  const setPct = (id, v) => {
     const el = document.getElementById(id);
-    if (el && document.activeElement !== el) el.value = v != null ? v : "";
+    if (el && document.activeElement !== el) {
+      el.value = v != null && v !== "" ? formatMoneyInput(v, 2) : "";
+    }
   };
   const setChk = (id, v) => {
     const el = document.getElementById(id);
@@ -1837,7 +1851,8 @@ function fillOtcSettingsForm(s) {
   setMoney("otc-bankroll", s.initial_bankroll_usd);
   setMoney("otc-daily-goal", s.daily_goal_usd);
   setMoney("otc-monthly-goal", s.monthly_goal_usd);
-  setVal("otc-stop-loss-pct", s.daily_stop_loss_pct);
+  setPct("otc-stop-win-pct", s.daily_stop_win_pct);
+  setPct("otc-stop-loss-pct", s.daily_stop_loss_pct);
   if (!isOtcFxAuto() || document.activeElement?.id !== "otc-usd-brl") {
     setMoney("otc-usd-brl", s.usd_brl_rate, 4);
   }
@@ -2047,16 +2062,13 @@ document.getElementById("otc-trades-date-clear")?.addEventListener("click", () =
 document.getElementById("otc-settings-form")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   const numOrNull = (id) => parseMoneyInput(document.getElementById(id)?.value);
-  const pctOrNull = (id) => {
-    const v = document.getElementById(id)?.value;
-    return v === "" || v == null ? null : Number(v);
-  };
   const payload = {
     stake_usd: numOrNull("otc-stake"),
     initial_bankroll_usd: numOrNull("otc-bankroll"),
     daily_goal_usd: numOrNull("otc-daily-goal"),
     monthly_goal_usd: numOrNull("otc-monthly-goal"),
-    daily_stop_loss_pct: pctOrNull("otc-stop-loss-pct"),
+    daily_stop_win_pct: numOrNull("otc-stop-win-pct"),
+    daily_stop_loss_pct: numOrNull("otc-stop-loss-pct"),
     usd_brl_rate: numOrNull("otc-usd-brl"),
     stop_win_enabled: document.getElementById("otc-stop-win-enabled")?.checked || false,
     stop_loss_enabled: document.getElementById("otc-stop-loss-enabled")?.checked || false,
@@ -2126,6 +2138,7 @@ document.querySelectorAll(".currency-btn").forEach((b) => {
 bindTableClicks();
 registerPwa();
 bindOtcMoneyInputs();
+bindOtcPctInputs();
 syncOtcFxAutoUi();
 
 async function bootstrap() {

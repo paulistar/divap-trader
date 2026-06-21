@@ -115,6 +115,15 @@ class OtcExecutor:
                 continue
             break
 
+        from src.otc.stop_alert import check_and_notify_otc_stop
+
+        if any(leg.executed and not leg.dry_run for leg in legs):
+            check_and_notify_otc_stop(
+                trade_repo=self._repo,
+                settings_repo=self._settings_repo,
+                timezone=self._config.signal_timezone,
+            )
+
         return self._sequence_result(signal, tuple(legs), max_protections)
 
     def _execute_leg(

@@ -290,8 +290,11 @@
           <label>Meta mensal (US$)
             <input type="text" inputmode="decimal" id="otc-monthly-goal" class="otc-money-input" placeholder="Ex: 800,00" />
           </label>
+          <label>Stop win diário (% da banca)
+            <input type="text" inputmode="decimal" id="otc-stop-win-pct" class="otc-pct-input" placeholder="Ex: 5" />
+          </label>
           <label>Stop loss diário (% da banca)
-            <input type="number" id="otc-stop-loss-pct" min="0" max="100" step="1" placeholder="Ex: 20" />
+            <input type="text" inputmode="decimal" id="otc-stop-loss-pct" class="otc-pct-input" placeholder="Ex: 20" />
           </label>
           <label class="otc-rate-label">Cotação US$ → R$
             <div class="otc-rate-row">
@@ -304,10 +307,10 @@
             </label>
           </label>
           <label class="filter-inline">
-            <input type="checkbox" id="otc-stop-win-enabled" /> Stop win (pausar ao bater meta do dia)
+            <input type="checkbox" id="otc-stop-win-enabled" /> Stop win (pausar ao atingir o % do dia)
           </label>
           <label class="filter-inline">
-            <input type="checkbox" id="otc-stop-loss-enabled" /> Stop loss diário (pausar ao perder o limite)
+            <input type="checkbox" id="otc-stop-loss-enabled" /> Stop loss (pausar ao perder o % do dia)
           </label>
           <button type="submit" class="secondary" id="otc-save-btn">Salvar configuração</button>
         </form>
@@ -432,6 +435,6 @@
   </div>
 
   <div id="modal-root"></div>
-  <script src="/dashboard/static/dashboard.js?v=16" defer></script>
+  <script src="/dashboard/static/dashboard.js?v=17" defer></script>
 </body>
 </html>

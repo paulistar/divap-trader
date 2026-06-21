@@ -21,14 +21,25 @@ def decide_stop(
     daily_goal_usd: Decimal | None,
     initial_bankroll_usd: Decimal | None,
     daily_stop_loss_pct: Decimal | None,
+    daily_stop_win_pct: Decimal | None = None,
 ) -> str | None:
     """Decide se as operações devem ser pausadas. Retorna o motivo ou ``None``.
 
     Função pura — toda a entrada vem de números já calculados.
     """
-    if stop_win_enabled and daily_goal_usd and daily_goal_usd > 0:
-        if day_pnl_usd >= daily_goal_usd:
-            return "stop_win"
+    if stop_win_enabled:
+        if (
+            daily_stop_win_pct
+            and daily_stop_win_pct > 0
+            and initial_bankroll_usd
+            and initial_bankroll_usd > 0
+        ):
+            win_limit = initial_bankroll_usd * daily_stop_win_pct / Decimal("100")
+            if day_pnl_usd >= win_limit:
+                return "stop_win"
+        elif daily_goal_usd and daily_goal_usd > 0:
+            if day_pnl_usd >= daily_goal_usd:
+                return "stop_win"
 
     if (
         stop_loss_enabled
@@ -65,14 +76,20 @@ def evaluate_otc_stop(trade_repo=None, settings_repo=None, timezone: str | None 
 
         totals = repo.otc_period_totals(tz)
         day_pnl = Decimal(str(totals.get("day", {}).get("pnl_usd") or 0))
-        return decide_stop(
+        reason = decide_stop(
             day_pnl,
             stop_win_enabled=cfg.stop_win_enabled,
             stop_loss_enabled=cfg.stop_loss_enabled,
             daily_goal_usd=cfg.daily_goal_usd,
             initial_bankroll_usd=cfg.initial_bankroll_usd,
             daily_stop_loss_pct=cfg.daily_stop_loss_pct,
+            daily_stop_win_pct=cfg.daily_stop_win_pct,
         )
+        if reason:
+            from src.otc.stop_alert import notify_otc_stop_if_needed
+
+            notify_otc_stop_if_needed(reason, day_pnl, timezone=tz)
+        return reason
     except Exception as exc:  # pragma: no cover - proteção defensiva
         logger.warning("Falha ao avaliar stop OTC (liberando): %s", exc)
         return None

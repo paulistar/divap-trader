@@ -39,8 +39,38 @@ class TestDecideStop:
                 daily_goal_usd=Decimal("50"),
                 initial_bankroll_usd=None,
                 daily_stop_loss_pct=None,
+                daily_stop_win_pct=None,
             )
             == "stop_win"
+        )
+
+    def test_stop_win_triggers_by_pct_of_bankroll(self):
+        # 5% de 1000 = 50
+        assert (
+            decide_stop(
+                Decimal("50"),
+                stop_win_enabled=True,
+                stop_loss_enabled=False,
+                daily_goal_usd=None,
+                initial_bankroll_usd=Decimal("1000"),
+                daily_stop_loss_pct=None,
+                daily_stop_win_pct=Decimal("5"),
+            )
+            == "stop_win"
+        )
+
+    def test_stop_win_pct_has_priority_over_usd_goal(self):
+        assert (
+            decide_stop(
+                Decimal("40"),
+                stop_win_enabled=True,
+                stop_loss_enabled=False,
+                daily_goal_usd=Decimal("30"),
+                initial_bankroll_usd=Decimal("1000"),
+                daily_stop_loss_pct=None,
+                daily_stop_win_pct=Decimal("5"),
+            )
+            is None
         )
 
     def test_stop_win_not_triggered_below_goal(self):
@@ -52,6 +82,7 @@ class TestDecideStop:
                 daily_goal_usd=Decimal("50"),
                 initial_bankroll_usd=None,
                 daily_stop_loss_pct=None,
+                daily_stop_win_pct=None,
             )
             is None
         )
@@ -66,6 +97,7 @@ class TestDecideStop:
                 daily_goal_usd=None,
                 initial_bankroll_usd=Decimal("1000"),
                 daily_stop_loss_pct=Decimal("10"),
+                daily_stop_win_pct=None,
             )
             == "stop_loss"
         )
@@ -79,6 +111,7 @@ class TestDecideStop:
                 daily_goal_usd=None,
                 initial_bankroll_usd=Decimal("1000"),
                 daily_stop_loss_pct=Decimal("10"),
+                daily_stop_win_pct=None,
             )
             is None
         )
@@ -91,6 +124,7 @@ class TestDecideStop:
             daily_goal_usd=Decimal("50"),
             initial_bankroll_usd=Decimal("1000"),
             daily_stop_loss_pct=Decimal("10"),
+            daily_stop_win_pct=None,
         )
         assert reason == "stop_win"
 
@@ -103,6 +137,7 @@ class TestDecideStop:
                 daily_goal_usd=None,
                 initial_bankroll_usd=None,
                 daily_stop_loss_pct=None,
+                daily_stop_win_pct=None,
             )
             is None
         )

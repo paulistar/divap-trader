@@ -851,7 +851,8 @@ body[data-view="settings"] #settings-section { display: block; }
 }
 .otc-settings-form label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; color: var(--text-muted); }
 .otc-settings-form input[type="number"],
-.otc-settings-form input[type="text"].otc-money-input {
+.otc-settings-form input[type="text"].otc-money-input,
+.otc-settings-form input[type="text"].otc-pct-input {
   background: var(--bg); color: var(--text);
   border: 1px solid var(--border); border-radius: 8px;
   padding: 0.5rem 0.6rem; font-size: 0.9rem;

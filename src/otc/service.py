@@ -163,6 +163,7 @@ def build_otc_overview() -> dict:
         daily_goal_usd=cfg.daily_goal_usd,
         initial_bankroll_usd=cfg.initial_bankroll_usd,
         daily_stop_loss_pct=cfg.daily_stop_loss_pct,
+        daily_stop_win_pct=cfg.daily_stop_win_pct,
     )
 
     return {

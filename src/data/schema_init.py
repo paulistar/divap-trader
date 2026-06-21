@@ -107,6 +107,7 @@ SCHEMA_STATEMENTS: list[str] = [
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS partials_taken INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS realized_pnl_usdt NUMERIC(20, 8) DEFAULT 0",
     "ALTER TABLE bankroll_settings ADD COLUMN IF NOT EXISTS active_profile_ids JSONB",
+    "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS daily_stop_win_pct NUMERIC(6, 2)",
     "CREATE INDEX IF NOT EXISTS idx_trades_market ON trades (market, status, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_alerts_market ON alerts (market, created_at DESC)",
     """
@@ -127,6 +128,7 @@ SCHEMA_STATEMENTS: list[str] = [
         daily_goal_usd NUMERIC(20, 2),
         monthly_goal_usd NUMERIC(20, 2),
         daily_stop_loss_pct NUMERIC(6, 2),
+        daily_stop_win_pct NUMERIC(6, 2),
         stop_win_enabled BOOLEAN NOT NULL DEFAULT FALSE,
         stop_loss_enabled BOOLEAN NOT NULL DEFAULT FALSE,
         usd_brl_rate NUMERIC(10, 4),

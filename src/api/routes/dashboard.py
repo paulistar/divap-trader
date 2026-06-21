@@ -87,6 +87,7 @@ class OtcSettingsBody(BaseModel):
     daily_goal_usd: Decimal | None = Field(default=None, ge=0)
     monthly_goal_usd: Decimal | None = Field(default=None, ge=0)
     daily_stop_loss_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    daily_stop_win_pct: Decimal | None = Field(default=None, ge=0, le=100)
     stop_win_enabled: bool | None = None
     stop_loss_enabled: bool | None = None
     usd_brl_rate: Decimal | None = Field(default=None, ge=0)
