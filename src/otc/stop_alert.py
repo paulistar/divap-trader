@@ -134,6 +134,10 @@ def check_and_notify_otc_stop(
         if not (settings_row.stop_win_enabled or settings_row.stop_loss_enabled):
             return None
 
+        from src.otc.daily_session import get_or_create_today_session
+
+        session = get_or_create_today_session(settings_row, timezone=tz)
+
         totals = repo.otc_period_totals(tz)
         day_pnl = Decimal(str(totals.get("day", {}).get("pnl_usd") or 0))
         reason = decide_stop(
@@ -141,9 +145,11 @@ def check_and_notify_otc_stop(
             stop_win_enabled=settings_row.stop_win_enabled,
             stop_loss_enabled=settings_row.stop_loss_enabled,
             daily_goal_usd=settings_row.daily_goal_usd,
-            initial_bankroll_usd=settings_row.initial_bankroll_usd,
+            initial_bankroll_usd=session.reference_balance_usd,
             daily_stop_loss_pct=settings_row.daily_stop_loss_pct,
             daily_stop_win_pct=settings_row.daily_stop_win_pct,
+            stop_win_usd=session.stop_win_usd,
+            stop_loss_usd=session.stop_loss_usd,
         )
         if reason:
             notify_otc_stop_if_needed(

@@ -108,6 +108,10 @@ SCHEMA_STATEMENTS: list[str] = [
     "ALTER TABLE trades ADD COLUMN IF NOT EXISTS realized_pnl_usdt NUMERIC(20, 8) DEFAULT 0",
     "ALTER TABLE bankroll_settings ADD COLUMN IF NOT EXISTS active_profile_ids JSONB",
     "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS daily_stop_win_pct NUMERIC(6, 2)",
+    "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS stake_pct NUMERIC(8, 4)",
+    "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS stake_min_usd NUMERIC(20, 2) DEFAULT 1.00",
+    "ALTER TABLE otc_settings ADD COLUMN IF NOT EXISTS stake_max_usd NUMERIC(20, 2)",
+    "ALTER TABLE otc_daily_session ADD COLUMN IF NOT EXISTS stake_risk_profile TEXT DEFAULT 'moderate'",
     "CREATE INDEX IF NOT EXISTS idx_trades_market ON trades (market, status, created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_alerts_market ON alerts (market, created_at DESC)",
     """
@@ -133,6 +137,21 @@ SCHEMA_STATEMENTS: list[str] = [
         stop_loss_enabled BOOLEAN NOT NULL DEFAULT FALSE,
         usd_brl_rate NUMERIC(10, 4),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS otc_daily_session (
+        session_date DATE PRIMARY KEY,
+        reference_balance_usd NUMERIC(20, 2) NOT NULL,
+        base_stake_usd NUMERIC(20, 2) NOT NULL,
+        stop_win_usd NUMERIC(20, 2) NOT NULL,
+        stop_loss_usd NUMERIC(20, 2) NOT NULL,
+        stake_pct NUMERIC(8, 4) NOT NULL,
+        stop_win_pct NUMERIC(6, 2) NOT NULL,
+        stop_loss_pct NUMERIC(6, 2) NOT NULL,
+        stake_risk_profile TEXT NOT NULL DEFAULT 'moderate',
+        source TEXT NOT NULL DEFAULT 'lazy',
+        captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
     """,
 ]

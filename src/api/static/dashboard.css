@@ -784,6 +784,55 @@ body[data-view="settings"] #settings-section { display: block; }
 .otc-stop-banner.win { background: #14532d; border: 1px solid var(--success); color: #bbf7d0; }
 .otc-stop-banner.loss { background: #4c1d1d; border: 1px solid var(--error); color: #fecaca; }
 
+.otc-daily-contract {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(16, 185, 129, 0.06));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.otc-contract-hint { margin: 0 0 0.75rem; font-size: 0.78rem; }
+
+.otc-stops-note { display: block; margin-top: 0.35rem; font-size: 0.75rem; }
+.otc-stops-readonly { margin-bottom: 0.75rem; }
+
+.otc-risk-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem 1rem;
+  margin: 0 0 1rem;
+}
+.otc-risk-fieldset legend {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 0.35rem;
+}
+.otc-risk-hint { margin: 0 0 0.75rem; font-size: 0.75rem; }
+.otc-risk-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.65rem;
+}
+.otc-risk-option {
+  display: block;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  background: var(--bg-card);
+  transition: border-color 0.15s, background 0.15s;
+}
+.otc-risk-option:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.08);
+}
+.otc-risk-option input { margin-right: 0.4rem; }
+.otc-risk-title { font-weight: 600; font-size: 0.9rem; display: block; }
+.otc-risk-range { font-size: 0.78rem; color: var(--accent); display: block; margin: 0.2rem 0; }
+.otc-risk-desc { font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; }
+
 /* Metas (barra de progresso) */
 .otc-goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
 .otc-goal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }

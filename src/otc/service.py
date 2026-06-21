@@ -8,7 +8,9 @@ from src.data.repositories.trade_repo import TradeRepository
 from src.otc.broker import IqOptionBroker
 from src.otc.config import load_otc_config, resolve_otc_telegram_chat_id
 from src.otc.guard import decide_stop
+from src.otc.martingale import stake_for_level
 from src.otc.periods import PERIOD_LABELS, VALID_PERIODS, normalize_period
+from src.otc.stake import risk_profiles_for_api
 from src.otc.telegram_user_listener import user_listener_configured
 from src.otc.iqoption_client import fetch_otc_capabilities, iqoption_configured, otc_transport
 from src.otc.iqoption_client import reset_iqoption_client as reset_connections
@@ -120,6 +122,15 @@ def _goal_progress(pnl: Decimal | None, goal: Decimal | None) -> dict | None:
     }
 
 
+def _stake_ladder_preview(base_stake: Decimal, config) -> list[str]:
+    mg = config.martingale
+    levels = max(0, mg.max_protections) + 1
+    return [
+        str(stake_for_level(base_stake, mg, level))
+        for level in range(levels)
+    ]
+
+
 def build_otc_overview() -> dict:
     """Status + banca + estatísticas + metas + travas para a tela IQ Option."""
     status = build_otc_status()
@@ -130,6 +141,14 @@ def build_otc_overview() -> dict:
     settings_repo = OtcSettingsRepository()
 
     cfg = settings_repo.get_settings()
+    daily_session = None
+    try:
+        from src.otc.daily_session import get_or_create_today_session
+
+        daily_session = get_or_create_today_session(cfg, timezone=tz)
+    except Exception:
+        daily_session = None
+
     try:
         stats = repo.otc_stats()
     except Exception:
@@ -156,19 +175,38 @@ def build_otc_overview() -> dict:
     day_pnl = _to_decimal((period_totals.get("day") or {}).get("pnl_usd")) or Decimal("0")
     month_pnl = _to_decimal((period_totals.get("month") or {}).get("pnl_usd")) or Decimal("0")
 
+    stop_win_usd = daily_session.stop_win_usd if daily_session else None
+    stop_loss_usd = daily_session.stop_loss_usd if daily_session else None
+    reference_balance = (
+        daily_session.reference_balance_usd if daily_session else cfg.initial_bankroll_usd
+    )
+
     stop_reason = decide_stop(
         day_pnl,
         stop_win_enabled=cfg.stop_win_enabled,
         stop_loss_enabled=cfg.stop_loss_enabled,
         daily_goal_usd=cfg.daily_goal_usd,
-        initial_bankroll_usd=cfg.initial_bankroll_usd,
+        initial_bankroll_usd=reference_balance,
         daily_stop_loss_pct=cfg.daily_stop_loss_pct,
         daily_stop_win_pct=cfg.daily_stop_win_pct,
+        stop_win_usd=stop_win_usd,
+        stop_loss_usd=stop_loss_usd,
     )
+
+    session_payload = None
+    if daily_session is not None:
+        session_payload = {
+            **daily_session.to_dict(),
+            "stake_ladder_usd": _stake_ladder_preview(
+                daily_session.base_stake_usd, config
+            ),
+        }
 
     return {
         **status,
         "settings": cfg.to_dict(),
+        "daily_session": session_payload,
+        "risk_profiles": risk_profiles_for_api(),
         "stats": stats,
         "trades": trades,
         "period_totals": period_totals,
@@ -176,6 +214,9 @@ def build_otc_overview() -> dict:
         "bankroll": {
             "balance_usd": str(balance) if balance is not None else None,
             "initial_bankroll_usd": str(initial_bankroll) if initial_bankroll is not None else None,
+            "reference_balance_usd": (
+                str(reference_balance) if reference_balance is not None else None
+            ),
             "profit_abs_usd": str(profit_abs) if profit_abs is not None else None,
             "profit_pct": profit_pct,
             "accumulated_pnl_usd": str(accumulated_pnl),
@@ -189,6 +230,9 @@ def build_otc_overview() -> dict:
             "loss_enabled": cfg.stop_loss_enabled,
             "active_reason": stop_reason,
             "blocked": stop_reason is not None,
+            "stop_win_usd": str(stop_win_usd) if stop_win_usd is not None else None,
+            "stop_loss_usd": str(stop_loss_usd) if stop_loss_usd is not None else None,
+            "day_pnl_usd": str(day_pnl),
         },
         "usd_brl_rate": str(cfg.usd_brl_rate) if cfg.usd_brl_rate is not None else None,
     }
@@ -248,6 +292,18 @@ def build_otc_trades_for_day(day: str, limit: int = 500) -> dict:
 
 def update_otc_settings(payload: dict) -> dict:
     """Persiste configurações do painel e devolve o overview atualizado."""
+    from src.otc.stake import stake_pct_for_profile, stop_pcts_for_profile
+
+    if payload.get("stake_risk_profile"):
+        profile = str(payload["stake_risk_profile"]).strip().lower()
+        stop_win, stop_loss = stop_pcts_for_profile(profile)
+        payload = {
+            **payload,
+            "stake_pct": stake_pct_for_profile(profile),
+            "daily_stop_win_pct": stop_win,
+            "daily_stop_loss_pct": stop_loss,
+        }
+
     repo = OtcSettingsRepository()
     repo.update_settings(**payload)
     return build_otc_overview()

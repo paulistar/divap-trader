@@ -1601,12 +1601,14 @@ function renderOtc(d) {
   renderOtcBadges(d);
   renderOtcStatusLine(d);
   renderOtcStopBanner(d);
+  renderOtcDailyContract(d);
   renderOtcBalance(d);
   renderOtcGoals(d);
   renderOtcStats(d);
   renderOtcMartingale(d);
   renderOtcPeriodTotals(d);
   loadOtcTradesFiltered();
+  renderOtcRiskProfiles(d);
   fillOtcSettingsForm(d.settings);
 }
 
@@ -1637,12 +1639,65 @@ function renderOtcStopBanner(d) {
   }
 }
 
+function renderOtcDailyContract(d) {
+  const section = document.getElementById("otc-daily-contract");
+  const grid = document.getElementById("otc-daily-contract-grid");
+  const session = d.daily_session;
+  if (!section || !grid) return;
+  if (!session) {
+    section.classList.add("hidden");
+    grid.innerHTML = "";
+    return;
+  }
+  section.classList.remove("hidden");
+  const profileMeta = (d.risk_profiles || []).find(
+    (p) => p.id === (session.stake_risk_profile || "moderate"),
+  );
+  const profileLabel = profileMeta ? profileMeta.label : session.stake_risk_profile;
+  const ladder = (session.stake_ladder_usd || [])
+    .map((v, i) => {
+      const labels = ["Entrada (L0)", "1ª proteção (P1)", "2ª proteção (P2)"];
+      const sub = i === 0 ? `${fmtNum(session.stake_pct)}% · ${profileLabel}` : "× gale 2,2";
+      return card(labels[i] || `Nível ${i}`, otcMoney(v), { sub });
+    })
+    .join("");
+  const captured = session.captured_at
+    ? new Date(session.captured_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    : "—";
+  const cards = [
+    card("Banca do dia", otcMoney(session.reference_balance_usd), {
+      highlight: true,
+      sub: `Snapshot ${session.session_date}`,
+    }),
+    card("Stop win", otcMoney(session.stop_win_usd), {
+      cls: "positive",
+      sub: `${fmtNum(session.stop_win_pct)}% · fixo hoje`,
+    }),
+    card("Stop loss", otcMoney(session.stop_loss_usd), {
+      cls: "negative",
+      sub: `${fmtNum(session.stop_loss_pct)}% · fixo hoje`,
+    }),
+    card("PnL do dia", otcMoney(d.stop?.day_pnl_usd, { sign: true }), {
+      cls: signClass(d.stop?.day_pnl_usd),
+      sub: d.stop?.blocked ? "trava ativa" : "em andamento",
+    }),
+  ].join("");
+  grid.innerHTML = cards + ladder;
+  const hint = section.querySelector(".otc-contract-hint");
+  if (hint) {
+    hint.textContent = `Fixado em ${captured} (${session.source || "snapshot"}) — entrada e stops não mudam até 23:59.`;
+  }
+}
+
 function renderOtcBalance(d) {
   const b = d.bankroll || {};
   const cards = [
     card("Saldo atual", otcMoney(b.balance_usd), { highlight: true }),
-    card("Banca inicial", otcMoney(b.initial_bankroll_usd), {
-      sub: b.initial_bankroll_usd ? "" : "defina abaixo",
+    card("Banca do dia", otcMoney(b.reference_balance_usd), {
+      sub: d.daily_session ? "snapshot 00:00" : "aguardando snapshot",
+    }),
+    card("Banca referência", otcMoney(b.initial_bankroll_usd), {
+      sub: b.initial_bankroll_usd ? "meta / histórico" : "defina abaixo",
     }),
     card("Lucro / Prejuízo", otcMoney(b.profit_abs_usd, { sign: true }), {
       cls: signClass(b.profit_abs_usd),
@@ -1829,6 +1884,39 @@ function renderOtcTrades(trades) {
     .join("");
 }
 
+function renderOtcRiskProfiles(d) {
+  const container = document.getElementById("otc-risk-options");
+  if (!container) return;
+  const profiles = d.risk_profiles || [];
+  const selected = d.settings?.stake_risk_profile || "moderate";
+  container.innerHTML = profiles
+    .map(
+      (p) => `<label class="otc-risk-option">
+        <input type="radio" name="otc-risk-profile" value="${p.id}" ${p.id === selected ? "checked" : ""} />
+        <span class="otc-risk-title">${p.label}</span>
+        <span class="otc-risk-range">Entrada ${p.range_label} · operacional ${fmtNum(p.stake_pct)}%</span>
+        <span class="otc-risk-range">Stop win ${p.stop_win_range_label} · stop loss ${p.stop_loss_range_label}</span>
+        <span class="otc-risk-desc">${p.description}</span>
+        <span class="otc-risk-desc">Pior ciclo gale (~${fmtNum(p.worst_cycle_loss_pct)}% da banca) — referência martingale 2,2</span>
+      </label>`,
+    )
+    .join("");
+  updateOtcStopsProfileNote(profiles, selected);
+}
+
+function updateOtcStopsProfileNote(profiles, selectedId) {
+  const note = document.getElementById("otc-stops-profile-note");
+  const p = profiles.find((x) => x.id === selectedId);
+  if (!note || !p) return;
+  note.textContent = `Perfil ${p.label}: stop win ${fmtNum(p.daily_stop_win_pct)}% · stop loss ${fmtNum(p.daily_stop_loss_pct)}% da banca do dia (fixos no snapshot).`;
+}
+
+document.getElementById("otc-risk-options")?.addEventListener("change", (e) => {
+  if (e.target.name === "otc-risk-profile" && otcOverview?.risk_profiles) {
+    updateOtcStopsProfileNote(otcOverview.risk_profiles, e.target.value);
+  }
+});
+
 function fillOtcSettingsForm(s) {
   if (!s) return;
   const setMoney = (id, v, digits = 2) => {
@@ -1847,12 +1935,15 @@ function fillOtcSettingsForm(s) {
     const el = document.getElementById(id);
     if (el) el.checked = !!v;
   };
-  setMoney("otc-stake", s.stake_usd);
+  document.querySelectorAll('input[name="otc-risk-profile"]').forEach((el) => {
+    el.checked = el.value === (s.stake_risk_profile || "moderate");
+  });
+  if (otcOverview?.risk_profiles) {
+    updateOtcStopsProfileNote(otcOverview.risk_profiles, s.stake_risk_profile || "moderate");
+  }
   setMoney("otc-bankroll", s.initial_bankroll_usd);
   setMoney("otc-daily-goal", s.daily_goal_usd);
   setMoney("otc-monthly-goal", s.monthly_goal_usd);
-  setPct("otc-stop-win-pct", s.daily_stop_win_pct);
-  setPct("otc-stop-loss-pct", s.daily_stop_loss_pct);
   if (!isOtcFxAuto() || document.activeElement?.id !== "otc-usd-brl") {
     setMoney("otc-usd-brl", s.usd_brl_rate, 4);
   }
@@ -2063,12 +2154,11 @@ document.getElementById("otc-settings-form")?.addEventListener("submit", async (
   e.preventDefault();
   const numOrNull = (id) => parseMoneyInput(document.getElementById(id)?.value);
   const payload = {
-    stake_usd: numOrNull("otc-stake"),
     initial_bankroll_usd: numOrNull("otc-bankroll"),
     daily_goal_usd: numOrNull("otc-daily-goal"),
     monthly_goal_usd: numOrNull("otc-monthly-goal"),
-    daily_stop_win_pct: numOrNull("otc-stop-win-pct"),
-    daily_stop_loss_pct: numOrNull("otc-stop-loss-pct"),
+    stake_risk_profile:
+      document.querySelector('input[name="otc-risk-profile"]:checked')?.value || "moderate",
     usd_brl_rate: numOrNull("otc-usd-brl"),
     stop_win_enabled: document.getElementById("otc-stop-win-enabled")?.checked || false,
     stop_loss_enabled: document.getElementById("otc-stop-loss-enabled")?.checked || false,

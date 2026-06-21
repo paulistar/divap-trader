@@ -264,13 +264,19 @@ class OtcExecutor:
         )
 
     def _effective_base_stake(self) -> Decimal:
-        """Valor de entrada: override do painel (otc_settings) ou default do YAML."""
+        """Entrada L0: snapshot diário (0h) ou fallback YAML."""
         try:
-            override = self._settings_repo.get_settings().stake_usd
-            if override is not None and override > 0:
-                return override
+            from src.otc.daily_session import get_or_create_today_session
+
+            cfg = self._settings_repo.get_settings()
+            session = get_or_create_today_session(
+                cfg,
+                timezone=self._config.signal_timezone,
+            )
+            if session.base_stake_usd > 0:
+                return session.base_stake_usd
         except Exception as exc:  # pragma: no cover - proteção defensiva
-            logger.warning("Falha ao ler stake do painel OTC (usando YAML): %s", exc)
+            logger.warning("Falha ao ler entrada da sessão OTC (usando YAML): %s", exc)
         return self._config.default_stake_usd
 
     @staticmethod

@@ -91,6 +91,13 @@ class OtcSettingsBody(BaseModel):
     stop_win_enabled: bool | None = None
     stop_loss_enabled: bool | None = None
     usd_brl_rate: Decimal | None = Field(default=None, ge=0)
+    stake_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    stake_min_usd: Decimal | None = Field(default=None, ge=0)
+    stake_max_usd: Decimal | None = Field(default=None, ge=0)
+    stake_risk_profile: str | None = Field(
+        default=None,
+        pattern=r"^(conservative|moderate|aggressive)$",
+    )
 
 
 class DashboardSettingsBody(BaseModel):

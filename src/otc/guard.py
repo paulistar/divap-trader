@@ -22,13 +22,19 @@ def decide_stop(
     initial_bankroll_usd: Decimal | None,
     daily_stop_loss_pct: Decimal | None,
     daily_stop_win_pct: Decimal | None = None,
+    stop_win_usd: Decimal | None = None,
+    stop_loss_usd: Decimal | None = None,
 ) -> str | None:
     """Decide se as operações devem ser pausadas. Retorna o motivo ou ``None``.
 
     Função pura — toda a entrada vem de números já calculados.
+    Limites fixos em USD (snapshot diário) têm prioridade sobre % da banca.
     """
     if stop_win_enabled:
-        if (
+        if stop_win_usd is not None and stop_win_usd > 0:
+            if day_pnl_usd >= stop_win_usd:
+                return "stop_win"
+        elif (
             daily_stop_win_pct
             and daily_stop_win_pct > 0
             and initial_bankroll_usd
@@ -41,16 +47,19 @@ def decide_stop(
             if day_pnl_usd >= daily_goal_usd:
                 return "stop_win"
 
-    if (
-        stop_loss_enabled
-        and daily_stop_loss_pct
-        and daily_stop_loss_pct > 0
-        and initial_bankroll_usd
-        and initial_bankroll_usd > 0
-    ):
-        loss_limit = (initial_bankroll_usd * daily_stop_loss_pct / Decimal("100")).copy_abs()
-        if day_pnl_usd <= -loss_limit:
-            return "stop_loss"
+    if stop_loss_enabled:
+        if stop_loss_usd is not None and stop_loss_usd > 0:
+            if day_pnl_usd <= -stop_loss_usd:
+                return "stop_loss"
+        elif (
+            daily_stop_loss_pct
+            and daily_stop_loss_pct > 0
+            and initial_bankroll_usd
+            and initial_bankroll_usd > 0
+        ):
+            loss_limit = (initial_bankroll_usd * daily_stop_loss_pct / Decimal("100")).copy_abs()
+            if day_pnl_usd <= -loss_limit:
+                return "stop_loss"
 
     return None
 
@@ -74,6 +83,10 @@ def evaluate_otc_stop(trade_repo=None, settings_repo=None, timezone: str | None 
         if not (cfg.stop_win_enabled or cfg.stop_loss_enabled):
             return None
 
+        from src.otc.daily_session import get_or_create_today_session
+
+        session = get_or_create_today_session(cfg, timezone=tz)
+
         totals = repo.otc_period_totals(tz)
         day_pnl = Decimal(str(totals.get("day", {}).get("pnl_usd") or 0))
         reason = decide_stop(
@@ -81,9 +94,11 @@ def evaluate_otc_stop(trade_repo=None, settings_repo=None, timezone: str | None 
             stop_win_enabled=cfg.stop_win_enabled,
             stop_loss_enabled=cfg.stop_loss_enabled,
             daily_goal_usd=cfg.daily_goal_usd,
-            initial_bankroll_usd=cfg.initial_bankroll_usd,
+            initial_bankroll_usd=session.reference_balance_usd,
             daily_stop_loss_pct=cfg.daily_stop_loss_pct,
             daily_stop_win_pct=cfg.daily_stop_win_pct,
+            stop_win_usd=session.stop_win_usd,
+            stop_loss_usd=session.stop_loss_usd,
         )
         if reason:
             from src.otc.stop_alert import notify_otc_stop_if_needed

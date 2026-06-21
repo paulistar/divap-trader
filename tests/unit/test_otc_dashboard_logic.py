@@ -142,6 +142,36 @@ class TestDecideStop:
             is None
         )
 
+    def test_fixed_stop_win_usd_from_daily_session(self):
+        assert (
+            decide_stop(
+                Decimal("99.27"),
+                stop_win_enabled=True,
+                stop_loss_enabled=False,
+                daily_goal_usd=Decimal("30"),
+                initial_bankroll_usd=Decimal("8272.80"),
+                daily_stop_loss_pct=None,
+                daily_stop_win_pct=Decimal("1.2"),
+                stop_win_usd=Decimal("99.27"),
+            )
+            == "stop_win"
+        )
+
+    def test_fixed_stop_loss_usd_from_daily_session(self):
+        assert (
+            decide_stop(
+                Decimal("-165.46"),
+                stop_win_enabled=False,
+                stop_loss_enabled=True,
+                daily_goal_usd=None,
+                initial_bankroll_usd=Decimal("8272.80"),
+                daily_stop_loss_pct=Decimal("2.0"),
+                daily_stop_win_pct=None,
+                stop_loss_usd=Decimal("165.46"),
+            )
+            == "stop_loss"
+        )
+
 
 class TestPeriods:
     def test_normalize_period_valid(self):

@@ -250,6 +250,12 @@
 
       <div id="otc-stop-banner" class="otc-stop-banner hidden" role="status"></div>
 
+      <section id="otc-daily-contract" class="otc-daily-contract hidden">
+        <h3 class="otc-h">Contrato do dia</h3>
+        <p class="subtitle otc-contract-hint">Valores fixados à meia-noite (horário de São Paulo) — entrada e stops não mudam até 23:59.</p>
+        <div class="grid" id="otc-daily-contract-grid"></div>
+      </section>
+
       <h3 class="otc-h">Banca & caixa</h3>
       <div class="grid" id="otc-balance-grid"></div>
 
@@ -278,10 +284,12 @@
       <section class="otc-settings-section">
         <h3 class="otc-h">Gestão de banca & metas</h3>
         <form id="otc-settings-form" class="otc-settings-form">
-          <label>Valor da entrada (US$)
-            <input type="text" inputmode="decimal" id="otc-stake" class="otc-money-input" placeholder="Ex: 5,00" />
-          </label>
-          <label>Banca inicial (US$)
+          <fieldset class="otc-risk-fieldset">
+            <legend>Perfil de risco da entrada</legend>
+            <p class="subtitle otc-risk-hint">Define o % da banca do dia usado na entrada (L0). Vale a partir do próximo snapshot (meia-noite ou 1ª operação).</p>
+            <div class="otc-risk-options" id="otc-risk-options"></div>
+          </fieldset>
+          <label>Banca referência / meta (US$)
             <input type="text" inputmode="decimal" id="otc-bankroll" class="otc-money-input" placeholder="Ex: 8.306,76" />
           </label>
           <label>Meta diária (US$)
@@ -290,11 +298,8 @@
           <label>Meta mensal (US$)
             <input type="text" inputmode="decimal" id="otc-monthly-goal" class="otc-money-input" placeholder="Ex: 800,00" />
           </label>
-          <label>Stop win diário (% da banca)
-            <input type="text" inputmode="decimal" id="otc-stop-win-pct" class="otc-pct-input" placeholder="Ex: 5" />
-          </label>
-          <label>Stop loss diário (% da banca)
-            <input type="text" inputmode="decimal" id="otc-stop-loss-pct" class="otc-pct-input" placeholder="Ex: 20" />
+          <label class="otc-stops-readonly">Stop win / loss diários
+            <span class="subtitle otc-stops-note" id="otc-stops-profile-note">Definidos automaticamente pelo perfil de risco escolhido.</span>
           </label>
           <label class="otc-rate-label">Cotação US$ → R$
             <div class="otc-rate-row">

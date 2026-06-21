@@ -47,6 +47,43 @@ def should_queue_otc_execution(signal: OtcSignal) -> bool:
     return signal.entry_time is not None or bool(signal.protection_schedule)
 
 
+@celery_app.task(name="src.otc.tasks.snapshot_otc_daily_session", queue="otc")
+def snapshot_otc_daily_session() -> dict:
+    """Snapshot meia-noite: trava banca, stops e entrada do dia."""
+    from src.data.repositories.otc_daily_session_repo import OtcDailySessionRepository
+    from src.data.repositories.otc_settings_repo import OtcSettingsRepository
+    from src.otc.config import load_otc_config
+    from src.otc.daily_session import (
+        build_session_from_balance,
+        current_local_date,
+        resolve_reference_balance,
+    )
+    from src.otc.iqoption_client import fetch_iqoption_balance
+
+    config = load_otc_config()
+    tz = config.signal_timezone
+    session_date = current_local_date(tz)
+    settings = OtcSettingsRepository().get_settings()
+    repo = OtcDailySessionRepository()
+
+    existing = repo.get_for_date(session_date)
+    if existing is not None:
+        return existing.to_dict()
+
+    balance, source = resolve_reference_balance(settings, fetch_iqoption_balance, repo)
+    if source == "live":
+        source = "beat"
+
+    session = build_session_from_balance(
+        session_date,
+        balance,
+        settings,
+        source=source,
+    )
+    saved = repo.upsert(session)
+    return saved.to_dict()
+
+
 @celery_app.task(name="src.otc.tasks.execute_otc_signal", queue="otc")
 def execute_otc_signal(signal_payload: dict) -> dict:
     signal = deserialize_signal(signal_payload)

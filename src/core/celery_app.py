@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 from src.core.config import settings
 
@@ -30,6 +31,11 @@ celery_app.conf.update(
         "beat-heartbeat": {
             "task": "src.execution.tasks.beat_heartbeat",
             "schedule": 60.0,
+        },
+        "otc-daily-snapshot": {
+            "task": "src.otc.tasks.snapshot_otc_daily_session",
+            # 00:00 America/Sao_Paulo (UTC-3, sem horário de verão)
+            "schedule": crontab(hour=3, minute=0),
         },
     },
 )

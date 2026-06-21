@@ -18,8 +18,9 @@ SELECT_OTC_SETTINGS_SQL = "SELECT * FROM otc_settings WHERE id = 1"
 UPSERT_OTC_SETTINGS_SQL = """
 INSERT INTO otc_settings (
     id, stake_usd, initial_bankroll_usd, daily_goal_usd, monthly_goal_usd,
-    daily_stop_loss_pct, daily_stop_win_pct, stop_win_enabled, stop_loss_enabled, usd_brl_rate
-) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    daily_stop_loss_pct, daily_stop_win_pct, stop_win_enabled, stop_loss_enabled, usd_brl_rate,
+    stake_pct, stake_min_usd, stake_max_usd, stake_risk_profile
+) VALUES (1, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (id) DO UPDATE SET
     stake_usd = EXCLUDED.stake_usd,
     initial_bankroll_usd = EXCLUDED.initial_bankroll_usd,
@@ -30,6 +31,10 @@ ON CONFLICT (id) DO UPDATE SET
     stop_win_enabled = EXCLUDED.stop_win_enabled,
     stop_loss_enabled = EXCLUDED.stop_loss_enabled,
     usd_brl_rate = EXCLUDED.usd_brl_rate,
+    stake_pct = EXCLUDED.stake_pct,
+    stake_min_usd = EXCLUDED.stake_min_usd,
+    stake_max_usd = EXCLUDED.stake_max_usd,
+    stake_risk_profile = EXCLUDED.stake_risk_profile,
     updated_at = NOW()
 RETURNING *
 """
@@ -52,6 +57,10 @@ class OtcSettingsRecord:
     stop_win_enabled: bool
     stop_loss_enabled: bool
     usd_brl_rate: Decimal | None
+    stake_pct: Decimal | None
+    stake_min_usd: Decimal | None
+    stake_max_usd: Decimal | None
+    stake_risk_profile: str
 
     def to_dict(self) -> dict:
         def s(value: Decimal | None) -> str | None:
@@ -67,6 +76,10 @@ class OtcSettingsRecord:
             "stop_win_enabled": self.stop_win_enabled,
             "stop_loss_enabled": self.stop_loss_enabled,
             "usd_brl_rate": s(self.usd_brl_rate),
+            "stake_pct": s(self.stake_pct),
+            "stake_min_usd": s(self.stake_min_usd),
+            "stake_max_usd": s(self.stake_max_usd),
+            "stake_risk_profile": self.stake_risk_profile,
         }
 
 
@@ -80,6 +93,10 @@ _EMPTY = OtcSettingsRecord(
     stop_win_enabled=False,
     stop_loss_enabled=False,
     usd_brl_rate=None,
+    stake_pct=None,
+    stake_min_usd=Decimal("1.00"),
+    stake_max_usd=None,
+    stake_risk_profile="moderate",
 )
 
 
@@ -113,10 +130,16 @@ class OtcSettingsRepository:
             "stop_win_enabled": current.stop_win_enabled,
             "stop_loss_enabled": current.stop_loss_enabled,
             "usd_brl_rate": current.usd_brl_rate,
+            "stake_pct": current.stake_pct,
+            "stake_min_usd": current.stake_min_usd,
+            "stake_max_usd": current.stake_max_usd,
+            "stake_risk_profile": current.stake_risk_profile,
         }
         for key in ("stop_win_enabled", "stop_loss_enabled"):
             if key in fields and fields[key] is not None:
                 merged[key] = bool(fields[key])
+        if "stake_risk_profile" in fields and fields["stake_risk_profile"] is not None:
+            merged["stake_risk_profile"] = str(fields["stake_risk_profile"]).strip().lower()
         for key in (
             "stake_usd",
             "initial_bankroll_usd",
@@ -125,6 +148,9 @@ class OtcSettingsRepository:
             "daily_stop_loss_pct",
             "daily_stop_win_pct",
             "usd_brl_rate",
+            "stake_pct",
+            "stake_min_usd",
+            "stake_max_usd",
         ):
             if key in fields:
                 merged[key] = _dec(fields[key])
@@ -143,6 +169,10 @@ class OtcSettingsRepository:
                         merged["stop_win_enabled"],
                         merged["stop_loss_enabled"],
                         merged["usd_brl_rate"],
+                        merged["stake_pct"],
+                        merged["stake_min_usd"],
+                        merged["stake_max_usd"],
+                        merged["stake_risk_profile"],
                     ),
                 )
                 row = cur.fetchone()
@@ -159,4 +189,8 @@ class OtcSettingsRepository:
             stop_win_enabled=bool(row.get("stop_win_enabled", False)),
             stop_loss_enabled=bool(row.get("stop_loss_enabled", False)),
             usd_brl_rate=_dec(row.get("usd_brl_rate")),
+            stake_pct=_dec(row.get("stake_pct")),
+            stake_min_usd=_dec(row.get("stake_min_usd")),
+            stake_max_usd=_dec(row.get("stake_max_usd")),
+            stake_risk_profile=str(row.get("stake_risk_profile") or "moderate"),
         )
