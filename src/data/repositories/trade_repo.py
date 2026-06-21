@@ -56,6 +56,18 @@ ORDER BY closed_at DESC
 LIMIT %s
 """
 
+LIST_OTC_CLOSED_LEGS_SQL = """
+SELECT id, symbol, direction, status, quantity, pnl_usdt, pnl_pct,
+       close_reason, opened_at, closed_at, exchange_order_id, trading_mode
+FROM trades
+WHERE venue = %s
+  AND status = 'closed'
+  AND closed_at IS NOT NULL
+  AND close_reason IN ('expiry', 'expiry_p1', 'expiry_p2')
+ORDER BY closed_at ASC
+LIMIT %s
+"""
+
 INSERT_TRADE_SQL = """
 INSERT INTO trades (
     alert_id, symbol, timeframe, direction, confidence, status,
@@ -669,6 +681,13 @@ class TradeRepository:
                     LIST_OTC_TRADES_BY_DAY_SQL,
                     (OTC_VENUE, timezone, day, limit),
                 )
+                return list(cur.fetchall())
+
+    def list_otc_closed_legs(self, limit: int = 10_000) -> list[dict]:
+        """Pernas OTC fechadas (expiry / expiry_p1 / expiry_p2) para simulação."""
+        with self._connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(LIST_OTC_CLOSED_LEGS_SQL, (OTC_VENUE, limit))
                 return list(cur.fetchall())
 
     def otc_pnl_breakdown_at(
