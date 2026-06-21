@@ -74,6 +74,7 @@ class OtcSettlementContext:
     duration_minutes: int
     order_id: str | None = None
     mcp_asset_id: int | None = None
+    mcp_position_id: int | None = None
     legacy_order_id: object | None = None
 
 

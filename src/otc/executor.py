@@ -94,13 +94,26 @@ class OtcExecutor:
             legs.append(leg_result)
 
             if not leg_result.executed:
+                logger.warning(
+                    "OTC sequência interrompida nível %s (%s %s stake=%s): %s",
+                    level,
+                    signal.asset,
+                    signal.direction,
+                    leg_result.stake_usd,
+                    leg_result.reason,
+                )
                 break
             if leg_result.dry_run:
                 break
             if leg_result.pnl_usd is None:
                 logger.warning(
-                    "OTC leg %s sem PnL — interrompe sequência martingale",
+                    "OTC leg %s sem PnL após settlement (order=%s, %s %s stake=%s) "
+                    "— interrompe sequência martingale",
                     level,
+                    leg_result.order_id,
+                    signal.asset,
+                    signal.direction,
+                    leg_result.stake_usd,
                 )
                 break
             if is_win(leg_result):

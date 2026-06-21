@@ -196,10 +196,17 @@ class IqOptionBroker:
             return self._poll_settlement_mcp_once(ctx)
         return self._poll_settlement_legacy_once(ctx)
 
+    @staticmethod
+    def _order_ids_match(left: str | None, right: object | None) -> bool:
+        if left is None or right is None:
+            return False
+        return str(left).strip() == str(right).strip()
+
     def _poll_settlement_mcp_once(self, ctx: OtcSettlementContext) -> Decimal | None:
         if ctx.mcp_asset_id is None:
             return None
         cache_key = ctx.order_id or f"{ctx.mcp_asset_id}:{ctx.stake_usd}"
+        position_id = ctx.mcp_position_id or self._mcp_open_position_ids.get(cache_key)
         try:
             positions_payload = mcp_call("list_positions")
         except ExchangeError:
@@ -211,20 +218,28 @@ class IqOptionBroker:
             self._mcp_open_position_ids[cache_key] = open_position_id
             return None
 
-        position_id = self._mcp_open_position_ids.get(cache_key)
+        if position_id is None:
+            position_id = self._mcp_open_position_ids.get(cache_key)
+
         history_payload = mcp_call("get_trade_history", {"skip": 0, "limit": 20})
-        for row in history_payload.get("history") or []:
-            if position_id is not None:
+        history = history_payload.get("history") or []
+
+        if position_id is not None:
+            for row in history:
                 if int(row.get("position_id") or 0) == position_id:
                     self._mcp_open_position_ids.pop(cache_key, None)
                     return Decimal(str(row.get("profit") or 0))
-                continue
-            if ctx.order_id and str(row.get("order_id") or "") == ctx.order_id:
+            return None
+
+        for row in history:
+            if self._order_ids_match(ctx.order_id, row.get("order_id")):
+                self._mcp_open_position_ids.pop(cache_key, None)
                 return Decimal(str(row.get("profit") or 0))
             if int(row.get("asset_id") or 0) != ctx.mcp_asset_id:
                 continue
             if Decimal(str(row.get("amount") or 0)) != ctx.stake_usd:
                 continue
+            self._mcp_open_position_ids.pop(cache_key, None)
             return Decimal(str(row.get("profit") or 0))
         return None
 
@@ -290,6 +305,11 @@ class IqOptionBroker:
             )
 
         order_id = str(trade_payload.get("order_id") or "")
+        position_id = self._resolve_mcp_position_id(
+            asset_id=asset_id,
+            stake=stake,
+            order_id=order_id or None,
+        )
         open_result = OtcTradeResult(
             executed=True,
             reason="opened",
@@ -308,8 +328,40 @@ class IqOptionBroker:
             duration_minutes=signal.expiry_minutes,
             order_id=order_id or None,
             mcp_asset_id=asset_id,
+            mcp_position_id=position_id,
         )
         return open_result, ctx
+
+    def _resolve_mcp_position_id(
+        self,
+        *,
+        asset_id: int,
+        stake: Decimal,
+        order_id: str | None,
+    ) -> int | None:
+        try:
+            positions_payload = mcp_call("list_positions")
+        except ExchangeError as exc:
+            logger.warning(
+                "OTC MCP list_positions após abertura falhou (order=%s): %s",
+                order_id,
+                exc,
+            )
+            return None
+
+        positions = positions_payload.get("positions") or []
+        for pos in positions:
+            if int(pos.get("asset_id") or 0) != asset_id:
+                continue
+            if Decimal(str(pos.get("amount") or 0)) != stake:
+                continue
+            if order_id is not None and not self._order_ids_match(
+                order_id,
+                pos.get("order_id"),
+            ):
+                continue
+            return int(pos["position_id"])
+        return None
 
     def _open_binary_legacy(
         self,
