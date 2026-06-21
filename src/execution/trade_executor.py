@@ -378,6 +378,18 @@ class TradeExecutor:
                 direction=signal.direction,
             )
 
+        profile = load_profile(profile_id)
+        tp_levels: tuple[Decimal, ...] | None = take_profit_levels
+        if tp_levels:
+            take_profit = tp_levels[-1]
+        elif profile is not None and uses_partial_take_profits(profile):
+            tp_levels = compute_partial_take_profit_levels(
+                entry_price,
+                take_profit,
+                signal.direction,
+                profile.exit.partial_take_profits,
+            )
+
         trade_id = self._repo.create_trade(
             alert_id=alert_id,
             symbol=signal.symbol,
@@ -403,6 +415,8 @@ class TradeExecutor:
             goal_protected=goal_protected,
             market=self._market.value,
             venue=self._venue.value,
+            take_profit_levels=tp_levels,
+            remaining_quantity=filled_qty if tp_levels else None,
         )
 
         logger.info("Trade #%s opened SELL %s qty=%s", trade_id, signal.symbol, filled_qty)

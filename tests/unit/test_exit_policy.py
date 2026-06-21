@@ -74,6 +74,24 @@ def test_compute_partial_take_profit_levels_buy() -> None:
     assert levels[2] == Decimal("68000")
 
 
+def test_compute_partial_take_profit_levels_sell() -> None:
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+    entry = Decimal("1792.77")
+    final_tp = Decimal("1101.01")
+    levels = compute_partial_take_profit_levels(
+        entry,
+        final_tp,
+        "sell",
+        profile.exit.partial_take_profits,
+    )
+    move = entry - final_tp
+    assert len(levels) == 3
+    assert levels[0] == entry - move * Decimal("0.25")
+    assert levels[1] == entry - move * Decimal("0.50")
+    assert levels[2] == final_tp
+
+
 def test_partial_close_quantity_equal_thirds() -> None:
     original = Decimal("0.9")
     remaining = Decimal("0.9")
@@ -272,3 +290,111 @@ def test_position_monitor_executes_first_partial() -> None:
     broker.market_sell.assert_called_once()
     repo.record_partial_close.assert_called_once()
     broker.cancel_order.assert_called_once()
+
+
+def test_position_monitor_executes_first_partial_sell() -> None:
+    trade = TradeRecord(
+        id=11,
+        alert_id=1,
+        symbol="ETHUSDT",
+        timeframe="4h",
+        direction="sell",
+        confidence="medium",
+        status="open",
+        entry_price=Decimal("1792.77"),
+        exit_price=None,
+        stop_loss=Decimal("1900"),
+        take_profit=Decimal("1101.01"),
+        quantity=Decimal("0.9"),
+        quote_amount=Decimal("1613.49"),
+        pnl_usdt=None,
+        pnl_pct=None,
+        fees_usdt=None,
+        context_verdict="caution",
+        context_score=50,
+        exchange_order_id="1",
+        stop_order_id=None,
+        tp_order_id=None,
+        close_reason=None,
+        trading_mode="testnet",
+        opened_at=datetime(2026, 6, 14, tzinfo=UTC),
+        closed_at=None,
+        created_at=datetime(2026, 6, 14, tzinfo=UTC),
+        profile_id="divap_ativo",
+        take_profit_levels=(
+            Decimal("1619.83"),
+            Decimal("1446.89"),
+            Decimal("1101.01"),
+        ),
+        remaining_quantity=Decimal("0.9"),
+        partials_taken=0,
+        realized_pnl_usdt=Decimal("0"),
+    )
+    broker = MagicMock()
+    broker.fetch_ticker_price.return_value = Decimal("1610")
+    broker.market_buy_quote.return_value = {"id": "buy-1"}
+    broker.parse_filled.return_value = (Decimal("1610"), Decimal("0.3"), Decimal("483"))
+    repo = MagicMock()
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+
+    monitor = PositionMonitor(broker=broker, trade_repo=repo)
+    with patch("src.execution.position_monitor.load_profile", return_value=profile):
+        closed = monitor._sync_sell_trade_partials(trade)
+
+    assert closed is False
+    broker.market_buy_quote.assert_called_once()
+    repo.record_partial_close.assert_called_once()
+    repo.update_stop_loss.assert_called_once_with(
+        trade.id,
+        trade.entry_price,
+        None,
+    )
+
+
+def test_position_monitor_resolves_partial_levels_for_legacy_sell() -> None:
+    trade = TradeRecord(
+        id=12,
+        alert_id=1,
+        symbol="ETHUSDT",
+        timeframe="4h",
+        direction="sell",
+        confidence="medium",
+        status="open",
+        entry_price=Decimal("1792.77"),
+        exit_price=None,
+        stop_loss=Decimal("1900"),
+        take_profit=Decimal("1101.01"),
+        quantity=Decimal("0.9"),
+        quote_amount=Decimal("1613.49"),
+        pnl_usdt=None,
+        pnl_pct=None,
+        fees_usdt=None,
+        context_verdict="caution",
+        context_score=50,
+        exchange_order_id="1",
+        stop_order_id=None,
+        tp_order_id=None,
+        close_reason=None,
+        trading_mode="testnet",
+        opened_at=datetime(2026, 6, 14, tzinfo=UTC),
+        closed_at=None,
+        created_at=datetime(2026, 6, 14, tzinfo=UTC),
+        profile_id="divap_ativo",
+        take_profit_levels=None,
+        remaining_quantity=None,
+        partials_taken=0,
+        realized_pnl_usdt=None,
+    )
+    broker = MagicMock()
+    broker.fetch_ticker_price.return_value = Decimal("2000")
+    repo = MagicMock()
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+
+    monitor = PositionMonitor(broker=broker, trade_repo=repo)
+    with patch("src.execution.position_monitor.load_profile", return_value=profile):
+        closed = monitor._sync_sell_trade(trade)
+
+    assert closed is False
+    broker.market_buy_quote.assert_not_called()

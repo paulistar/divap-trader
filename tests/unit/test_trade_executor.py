@@ -213,3 +213,78 @@ def test_executor_live_buy(
     assert result.reason == "ok"
     assert result.trade_id == 99
     broker.market_buy_quote.assert_called_once()
+
+
+def _sell_signal() -> DIVAPSignal:
+    return DIVAPSignal(
+        symbol="ETHUSDT",
+        timeframe="4h",
+        direction="sell",
+        confidence="medium",
+        criteria=DIVAPCriteria(True, True, True, True),
+        entry_price=Decimal("1792.77"),
+        stop_loss=Decimal("1900"),
+        targets=(Decimal("1101.01"),),
+        current_price=Decimal("1792.77"),
+        rsi_value=65.0,
+        volume_ratio=1.5,
+        divergence_type="bearish",
+        pattern_detected="bearish_engulfing",
+        fibo_level=Decimal("0.618"),
+        timestamp=datetime.now(UTC),
+    )
+
+
+@patch("src.execution.trade_executor.get_execution_profile_for")
+@patch("src.execution.trade_executor.get_execution_context", return_value=("divap_ativo", False))
+@patch("src.execution.trade_executor.settings")
+@patch.object(TradeExecutor, "_fetch_candles", return_value=[])
+def test_executor_live_sell_with_partial_take_profits(
+    mock_fetch: MagicMock,
+    mock_settings: MagicMock,
+    mock_execution_context: MagicMock,
+    mock_profile_for: MagicMock,
+) -> None:
+    profile = load_profile("divap_ativo")
+    assert profile is not None
+    mock_profile_for.return_value = (
+        profile,
+        profile.execution,
+        {"protected_mode": False, "active_profile_id": "divap_ativo"},
+    )
+    mock_settings.trading_enabled = True
+    mock_settings.trading_mode = "testnet"
+    mock_settings.binance_use_testnet = True
+    mock_settings.trading_min_confidence = "high"
+    mock_settings.trading_block_on_context_reject = True
+    mock_settings.trading_max_open_trades = 5
+    mock_settings.trading_dry_run = False
+
+    broker = MagicMock()
+    broker.get_base_balance.return_value = Decimal("1.0")
+    broker.min_notional.return_value = Decimal("10")
+    broker.market_sell.return_value = {
+        "id": "order-1",
+        "average": 1792.77,
+        "filled": 0.9,
+        "cost": 1613.49,
+    }
+    broker.parse_filled.return_value = (
+        Decimal("1792.77"),
+        Decimal("0.9"),
+        Decimal("1613.49"),
+    )
+
+    repo = MagicMock()
+    repo.count_open_trades.return_value = 0
+    repo.has_open_trade.return_value = False
+    repo.create_trade.return_value = 100
+
+    executor = TradeExecutor(broker=broker, trade_repo=repo)
+    result = executor.try_execute(_sell_signal(), alert_id=4, market_context=_context())
+
+    assert result.executed is True
+    call_kwargs = repo.create_trade.call_args.kwargs
+    assert call_kwargs["take_profit_levels"] is not None
+    assert len(call_kwargs["take_profit_levels"]) == 3
+    assert call_kwargs["remaining_quantity"] == Decimal("0.9")

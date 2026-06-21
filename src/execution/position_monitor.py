@@ -12,7 +12,7 @@ from src.execution.interfaces import ExecutionBroker
 from src.execution.binance_broker import BinanceBroker  # noqa: F401 — parse_filled on broker instances
 from src.markets.factory import get_broker, get_data_source
 from src.markets.types import Venue
-from src.profiles.exit_policy import partial_close_quantity, should_time_stop
+from src.profiles.exit_policy import partial_close_quantity, should_time_stop, uses_partial_take_profits, compute_partial_take_profit_levels
 from src.profiles.loader import load_profile
 
 logger = logging.getLogger(__name__)
@@ -78,9 +78,27 @@ class PositionMonitor:
     def _sync_trade(self, trade: TradeRecord) -> bool:
         if self._apply_time_stop(trade):
             return True
+        trade = self._with_resolved_partial_levels(trade)
         if trade.direction == "buy":
             return self._sync_buy_trade(trade)
         return self._sync_sell_trade(trade)
+
+    def _with_resolved_partial_levels(self, trade: TradeRecord) -> TradeRecord:
+        if trade.take_profit_levels:
+            return trade
+        profile = load_profile(trade.profile_id or "divap")
+        if profile is None or not uses_partial_take_profits(profile):
+            return trade
+        if not trade.entry_price or not trade.take_profit:
+            return trade
+        levels = compute_partial_take_profit_levels(
+            trade.entry_price,
+            trade.take_profit,
+            trade.direction,
+            profile.exit.partial_take_profits,
+        )
+        remaining = trade.remaining_quantity or trade.quantity
+        return replace(trade, take_profit_levels=levels, remaining_quantity=remaining)
 
     def _apply_time_stop(self, trade: TradeRecord) -> bool:
         profile = load_profile(trade.profile_id or "divap")
@@ -172,14 +190,20 @@ class PositionMonitor:
         if sell_qty <= 0:
             return False
 
-        order = self._broker.market_sell(trade.symbol, sell_qty)
+        if trade.direction == "buy":
+            order = self._broker.market_sell(trade.symbol, sell_qty)
+        else:
+            order = self._broker.market_buy_quote(trade.symbol, sell_qty * price)
         exit_price, filled_qty, _ = self._broker.parse_filled(order)
         if exit_price <= 0:
             exit_price = price
         if filled_qty <= 0:
             filled_qty = sell_qty
 
-        chunk_pnl, _ = _pnl_for_buy(trade.entry_price, exit_price, filled_qty)
+        if trade.direction == "buy":
+            chunk_pnl, _ = _pnl_for_buy(trade.entry_price, exit_price, filled_qty)
+        else:
+            chunk_pnl, _ = _pnl_for_sell(trade.entry_price, exit_price, filled_qty)
         realized = (trade.realized_pnl_usdt or Decimal(0)) + chunk_pnl
         new_remaining = remaining - filled_qty
         new_partials = trade.partials_taken + 1
@@ -244,21 +268,26 @@ class PositionMonitor:
         remaining = trade.effective_remaining
         if remaining <= 0:
             return
-        if trade.stop_order_id and hasattr(self._broker, "cancel_order"):
-            self._broker.cancel_order(trade.symbol, trade.stop_order_id)
 
         breakeven = trade.entry_price
-        new_stop = self._broker.place_stop_loss_limit(
-            trade.symbol,
-            remaining,
-            breakeven,
-            breakeven * Decimal("0.995"),
-        )
-        new_order_id = str(new_stop["id"]) if new_stop else None
+        new_order_id: str | None = None
+        if trade.direction == "buy":
+            if trade.stop_order_id and hasattr(self._broker, "cancel_order"):
+                self._broker.cancel_order(trade.symbol, trade.stop_order_id)
+            new_stop = self._broker.place_stop_loss_limit(
+                trade.symbol,
+                remaining,
+                breakeven,
+                breakeven * Decimal("0.995"),
+            )
+            new_order_id = str(new_stop["id"]) if new_stop else None
         self._repo.update_stop_loss(trade.id, breakeven, new_order_id)
         logger.info("Trade #%s stop moved to breakeven @ %s", trade.id, breakeven)
 
     def _sync_sell_trade(self, trade: TradeRecord) -> bool:
+        if trade.has_partial_exits:
+            return self._sync_sell_trade_partials(trade)
+
         if not trade.entry_price or not trade.stop_loss or not trade.take_profit:
             return False
 
@@ -267,6 +296,34 @@ class PositionMonitor:
             return self._market_close(trade, "stop_loss")
         if price <= trade.take_profit:
             return self._market_close(trade, "take_profit")
+        return False
+
+    def _sync_sell_trade_partials(self, trade: TradeRecord) -> bool:
+        if trade.stop_order_id:
+            closed, exit_price = self._order_closed(trade.symbol, trade.stop_order_id)
+            if closed and exit_price:
+                return self._close_with_accumulated(trade, exit_price, "stop_loss")
+
+        if (
+            not trade.entry_price
+            or not trade.stop_loss
+            or not trade.take_profit
+            or not trade.take_profit_levels
+            or not trade.quantity
+        ):
+            return False
+
+        price = self._broker.fetch_ticker_price(trade.symbol)
+        if price >= trade.stop_loss:
+            return self._market_close(trade, "stop_loss")
+
+        levels = trade.take_profit_levels
+        if trade.partials_taken >= len(levels):
+            return False
+
+        target_price = levels[trade.partials_taken]
+        if price <= target_price:
+            return self._execute_partial_take_profit(trade, price)
         return False
 
     def _market_close(self, trade: TradeRecord, reason: str) -> bool:
